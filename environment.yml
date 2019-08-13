@@ -1,4 +1,4 @@
-name: jazz-ai
+name: pianofortai
 channels:
   - pytorch
   - https://repo.anaconda.com/pkgs/free
@@ -115,5 +115,5 @@ dependencies:
   - pip:
     - mido==1.2.9
     - pretty-midi==0.2.8
-prefix: /Users/nikku/miniconda3/envs/jazz-ai
+prefix: /Users/nikku/miniconda3/envs/pianofort-ai
 
