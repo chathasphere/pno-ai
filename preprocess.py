@@ -2,15 +2,22 @@ import os
 import pretty_midi
 import six
 import copy
-import pdb
+from sequence_encoder import SequenceEncoder
 
 class PreprocessingError(Exception):
     pass
 
 class PreprocessingPipeline():
-
+    """
+    Pipeline to convert MIDI files to cleaned Piano Midi Note Sequences, split into 
+    a more manageable length.
+    Applies any sustain pedal activity to extend note lengths. Optionally augments
+    the data by transposing pitch and/or stretching sample speed. Optionally quantizes
+    timing and/or dynamics into smaller bins.
+    """
     def __init__(self, input_dir, stretch_factors = [0.95, 0.975, 1, 1.025, 1.05],
-            split_size = 30, sampling_rate = 125):
+            split_size = 30, sampling_rate = 125, n_velocity_bins = 32,
+            transpositions = range(-3,4)):
         self.input_dir = input_dir
         self.note_sequences = []
         #size (in seconds) in which to split midi samples
@@ -18,9 +25,17 @@ class PreprocessingPipeline():
         self.stretch_factors = stretch_factors
         self.split_size = split_size
         self.quantized_samples = []
-        #In hertz (beats per second), quantize samples to this discrete frequency
+        #In hertz (beats per second), quantize sample timings to this discrete frequency
         #So a sampling rate of 125 hz means a smallest time steps of 8 ms
         self.sampling_rate = sampling_rate
+        #Quantize sample dynamics (Velocity 1-127) to a smaller number of bins
+        #this should be an *integer* dividing 128 cleanly: 2,4,8,16,32,64, or 128. 
+        self.n_velocity_bins = n_velocity_bins
+        self.transpositions = transpositions
+
+        self.encoder = SequenceEncoder(n_time_shift_events = sampling_rate,
+                n_velocity_events = n_velocity_bins)
+        self.encoded_sequences = []
 
 
     def run(self):
@@ -32,10 +47,17 @@ class PreprocessingPipeline():
         print("{} midis read, or {:.1f} minutes of music"\
                 .format(len(midis), total_time))
 
-        self.note_sequences = self.get_note_sequences(midis)
-        self.note_sequences = self.stretch_note_sequences()
-        #stretch the note sequences?
+        self.get_note_sequences(midis)
+        print("{} note sequences ".format(len(self.note_sequences)))
+        self.stretch_note_sequences()
+        print("{} time-stretched note sequences".format(len(self.note_sequences)))
         self.split_sequences()
+        self.quantize_samples()
+        print("{} quantized, split samples".format(len(self.split_samples)))
+        self.transpose_samples()
+        print("{} transposed samples".format(len(self.split_samples)))
+        samples = self.split_samples
+        self.encoded_sequences = self.encoder.encode_event_sequences(samples)
 
     def convert_files(self):
         pretty_midis = []
@@ -58,7 +80,6 @@ class PreprocessingPipeline():
         return pretty_midis
 
     def get_note_sequences(self, midis):
-        note_sequences = []
         for m in midis:
             if m.instruments[0].program == 0:
                 piano_data = m.instruments[0]
@@ -66,9 +87,7 @@ class PreprocessingPipeline():
                 #todo: write logic to safely catch if there are non piano instruments,
                 #or extract the piano midi if it exists
                 raise PreprocessingError("Non-piano midi detected")
-            note_sequences.append(self.apply_sustain(piano_data))
-
-        return note_sequences
+            self.note_sequences.append(self.apply_sustain(piano_data))
 
 
     def apply_sustain(self, piano_data):
@@ -160,8 +179,8 @@ class PreprocessingPipeline():
                     note.end *= factor
                 stretched_note_sequences.append(stretched_sequence)
 
-        return stretched_note_sequences
-    
+        self.note_sequences = stretched_note_sequences
+
 
     def split_sequences(self):
         if len(self.note_sequences) == 0:
@@ -188,6 +207,54 @@ class PreprocessingPipeline():
                     sample_length = 0
                     sample = []
                 i += 1
+
+    def quantize_samples(self):
+        """
+        Quantize note sequence timing (note start and end) to a smallest timestep,
+        typically 8-10 ms. Quantize note sequence dynamics (note velocity) to a smaller
+        number of bins, on the order of 32. This step ends up freeing up a lot of memory
+        with little audible loss in fidelity.
+        """
+        #define smallest timestep (in seconds)
+        try:
+            timestep = 1 / self.sampling_rate
+        except ZeroDivisionError:
+            timestep = 0
+        #define smallest dynamics increment
+        try:
+            velocity_step = 128 // self.n_velocity_bins
+        except ZeroDivisionError:
+            velocity_step = 0
+        for sample in self.split_samples:
+            for note in sample:
+                if timestep:
+                    #quantize timing
+                    note.start = (note.start // timestep) * timestep
+                    note.end = (note.end // timestep) * timestep
+                if velocity_step:
+                    #quantize dynamics
+                    #smallest velocity is 1 (otherwise we can't hear it!)
+                    note.velocity = (note.velocity // velocity_step *\
+                            velocity_step) + 1
+
+    def transpose_samples(self):
+        transposed_samples = []
+        for sample in self.split_samples:
+            for transposition in self.transpositions:
+                if transposition == 0:
+                    transposed_samples.append(sample)
+                    continue
+                transposed_sample = copy.deepcopy(sample)
+                for note in transposed_sample:
+                    new_pitch = note.pitch + transposition
+                    if new_pitch > 127:
+                        new_pitch -= 12
+                    elif new_pitch < 0:
+                        new_pitch += 12
+                    note.pitch = new_pitch
+                transposed_samples.append(transposed_sample)
+
+        self.split_samples = transposed_samples
 
 
 

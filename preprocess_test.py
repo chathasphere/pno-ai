@@ -2,16 +2,25 @@ import os
 import pdb
 from pretty_midi import PrettyMIDI, Instrument
 from preprocess import PreprocessingPipeline
+import pathlib
 
-def write_to_midi(note_sequences, output_dir):
-    i = 1
-    for note_sequence in note_sequences:
+def write_to_midi(note_sequences, output_dir, n_to_write=None):
+
+    if len(note_sequences) == 0:
+        print("No note sequences to write out...")
+        return
+    #number of sequences to write out as MIDI files
+    if n_to_write is None:
+        n_to_write = len(note_sequences)
+    #make the output directory if it doesn't already exist
+    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True) 
+    for i in range(n_to_write):
+    #for note_sequence in note_sequences:
         midi = PrettyMIDI(initial_tempo = 80)
         piano = Instrument(program=0, is_drum=False, name="test{}".format(i))
-        piano.notes = note_sequence
+        piano.notes = note_sequences[i]
         midi.instruments.append(piano)
         output_name = output_dir + "/test{}.midi".format(i)
-        i += 1
         #with open(output_name, 'w')
         midi.write(output_name)
     print("Piano data successfully extracted from midis, navigate to {} to listen"\
@@ -30,12 +39,13 @@ def check_sample_lengths(split_samples, split_size):
     print("All samples are less than {} seconds in length.".format(split_size))
 
 def main():
-    pipeline = PreprocessingPipeline(input_dir = "data/test", split_size = 30)
+    pipeline = PreprocessingPipeline(input_dir = "data/test", split_size = 30,
+            n_velocity_bins = 32)
     pipeline.run()
-    # write_to_midi(pipeline.note_sequences, "output/test")
-    check_sample_lengths(pipeline.split_samples, 30)
-    # pdb.set_trace()
-
+    #write_to_midi(pipeline.note_sequences, "output/test_midis")
+    # check_sample_lengths(pipeline.split_samples, 30)
+    #write_to_midi(pipeline.split_samples, "output/test_samples", n_to_write=20)
+    encoded_sequences = pipeline.encoded_sequences
 
 if __name__ == "__main__":
     main()
