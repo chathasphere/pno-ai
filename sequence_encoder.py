@@ -62,15 +62,16 @@ class SequenceEncoder():
             current_time = 0
             max_timeshift = self.n_time_shift_events
             #this loop encodes timeshifts as numbers
+            #consider turning this into a function to help readability
             for timestamp in event_timestamps:
-                #capture a timeshift
+                #capture a shift in absolute time
                 if timestamp[0] != current_time:
+                    #convert to relative time and convert to number of quantized timesteps
                     timeshift = (timestamp[0] *  self.n_time_shift_events) - \
                             (current_time * self.n_time_shift_events)
                     timeshift_events = []
                     #aggregate pauses longer than one second, as necessary
                     while timeshift > max_timeshift:
-                        #timeshift_events.append(("TIME_SHIFT", 125))
                         timeshift_events.append(
                                 self.event_to_number("TIME_SHIFT", max_timeshift))
                         timeshift -= max_timeshift

@@ -24,7 +24,6 @@ class PreprocessingPipeline():
         self.split_samples = []
         self.stretch_factors = stretch_factors
         self.split_size = split_size
-        self.quantized_samples = []
         #In hertz (beats per second), quantize sample timings to this discrete frequency
         #So a sampling rate of 125 hz means a smallest time steps of 8 ms
         self.sampling_rate = sampling_rate
@@ -87,7 +86,10 @@ class PreprocessingPipeline():
                 #todo: write logic to safely catch if there are non piano instruments,
                 #or extract the piano midi if it exists
                 raise PreprocessingError("Non-piano midi detected")
-            self.note_sequences.append(self.apply_sustain(piano_data))
+            note_sequence = self.apply_sustain(piano_data)
+            note_sequence = sorted(note_sequence, key = lambda x: (x.start, x.pitch))
+            self.note_sequences.append(note_sequence)
+
 
 
     def apply_sustain(self, piano_data):
@@ -191,7 +193,7 @@ class PreprocessingPipeline():
             sample = []
             i = 0
             while i < len(note_sequence):
-                note = note_sequence[i]
+                note = copy.deepcopy(note_sequence[i])
                 if sample_length == 0:
                     sample_start = note.start
                 new_length = note.end - sample_start
@@ -229,8 +231,8 @@ class PreprocessingPipeline():
             for note in sample:
                 if timestep:
                     #quantize timing
-                    note.start = (note.start // timestep) * timestep
-                    note.end = (note.end // timestep) * timestep
+                    note.start = (note.start * self.sampling_rate) // 1 * timestep
+                    note.end = (note.end * self.sampling_rate) // 1 * timestep
                 if velocity_step:
                     #quantize dynamics
                     #smallest velocity is 1 (otherwise we can't hear it!)

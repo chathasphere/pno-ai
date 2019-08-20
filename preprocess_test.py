@@ -26,6 +26,19 @@ def write_to_midi(note_sequences, output_dir, n_to_write=None):
     print("Piano data successfully extracted from midis, navigate to {} to listen"\
             .format(output_dir))
 
+def check_ordering(note_sequences):
+    for note_sequence in note_sequences:
+        ordered = True
+        current_time = 0
+        for note in note_sequence:
+            if note.start < current_time:
+                ordered = False
+            current_time = note.start
+        try: 
+            assert ordered
+        except AssertionError:
+            pdb.set_trace()
+
 def check_sample_lengths(split_samples, split_size):
     for i in range(len(split_samples)):
         sample = split_samples[i]
@@ -39,9 +52,13 @@ def check_sample_lengths(split_samples, split_size):
     print("All samples are less than {} seconds in length.".format(split_size))
 
 def main():
-    pipeline = PreprocessingPipeline(input_dir = "data/test", split_size = 30,
+    pipeline = PreprocessingPipeline(input_dir = "data/quick_test", split_size = 30,
             n_velocity_bins = 32)
     pipeline.run()
+    check_ordering(pipeline.note_sequences)
+    print("Note sequences in order")
+    check_ordering(pipeline.split_samples)
+    print("Split samples in order")
     #write_to_midi(pipeline.note_sequences, "output/test_midis")
     # check_sample_lengths(pipeline.split_samples, 30)
     #write_to_midi(pipeline.split_samples, "output/test_samples", n_to_write=20)
