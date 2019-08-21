@@ -2,7 +2,7 @@ from pretty_midi import Note
 from sequence_encoder import SequenceEncoder
 import pdb
 
-sample_note_sequence = [
+sample_note_sequence0 = [
     [Note(start=0.928000, end=1.720000, pitch=54, velocity=25), 
     Note(start=0.952000, end=1.744000, pitch=42, velocity=25), 
     Note(start=0.952000, end=1.720000, pitch=47, velocity=29), 
@@ -36,13 +36,29 @@ sample_note_sequence1 = [
     Note(start=1.384000, end=1.968000, pitch=59, velocity=29)]
         ]
 
+
+sample_note_sequence2 = [
+    [Note(start=535.864000, end=536.296000, pitch=81, velocity=77), 
+    Note(start=535.968000, end=536.368000, pitch=88, velocity=89), 
+    Note(start=536.080000, end=536.664000, pitch=79, velocity=77), 
+    Note(start=536.176000, end=537.056000, pitch=78, velocity=89), 
+    Note(start=536.296000, end=537.608000, pitch=81, velocity=73), 
+    Note(start=536.368000, end=543.224000, pitch=88, velocity=77), 
+    Note(start=536.472000, end=536.752000, pitch=86, velocity=77), 
+    Note(start=536.568000, end=537.416000, pitch=76, velocity=77), 
+    Note(start=536.664000, end=537.984000, pitch=79, velocity=73), 
+    Note(start=536.752000, end=544.648000, pitch=86, velocity=69)]
+    ]
+
 def main():
+    sample = sample_note_sequence2
+
     encoder = SequenceEncoder(n_time_shift_events = 125, n_velocity_events = 32)
     assert encoder.n_events == 413
-    encoded = encoder.encode_event_sequences(sample_note_sequence)
-    decoded = encoder.decode_event_sequences(encoded)
+    encoded = encoder.encode_sequences(sample)
+    decoded = encoder.decode_sequences(encoded)
     
-    original_seq = sorted(sample_note_sequence[0], key = lambda x: x.start)
+    original_seq = sorted(sample[0], key = lambda x: x.start)
     decoded_seq = sorted(decoded[0], key = lambda x: x.start)
     for o,d in zip(original_seq, decoded_seq):
         try:
@@ -57,6 +73,7 @@ def main():
             print("Decoded encoded note:")
             print(d)
             print('************')
+    print("Successful encoding and decoding of sequence!")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@ import os, random, copy
 import pretty_midi
 import six
 from sequence_encoder import SequenceEncoder
-import pdb
 
 class PreprocessingError(Exception):
     pass
@@ -291,7 +290,14 @@ class PreprocessingPipeline():
         except ZeroDivisionError:
             velocity_step = 0
         for sample in samples:
+            sample_start_time = next(note.start for note in sample)
             for note in sample:
+                #set start time to zero
+                note.start -= sample_start_time
+                note.end -= sample_start_time
+                #delete this 
+                if note.start < 0 or note.end < 0:
+                    raise PreprocessingError
                 if timestep:
                     #quantize timing
                     note.start = (note.start * self.sampling_rate) // 1 * timestep

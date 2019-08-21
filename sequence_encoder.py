@@ -1,5 +1,4 @@
 from pretty_midi import Note
-import pdb
 
 class SequenceEncoderError(Exception):
     pass
@@ -69,6 +68,8 @@ class SequenceEncoder():
                     #convert to relative time and convert to number of quantized timesteps
                     timeshift = (timestamp[0] *  self.n_time_shift_events) - \
                             (current_time * self.n_time_shift_events)
+                    #this is hacky but sue me
+                    timeshift = int(timeshift + .1)
                     timeshift_events = []
                     #aggregate pauses longer than one second, as necessary
                     while timeshift > max_timeshift:
