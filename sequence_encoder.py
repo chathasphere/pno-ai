@@ -27,7 +27,7 @@ class SequenceEncoder():
         self.velocity_bin_size = 128 // n_velocity_events
         self.sequences_per_update = sequences_per_update
 
-    def encode_event_sequences(self, sample_sequences):
+    def encode_sequences(self, sample_sequences):
         """
         Converts each sample note sequence into an "event" sequence, a list of integers
         0 through N-1 where N is the total number of events in the encoder's
@@ -127,7 +127,7 @@ class SequenceEncoder():
         return event
 
 
-    def decode_event_sequences(self, encoded_sequences):
+    def decode_sequences(self, encoded_sequences):
         note_sequences = []
         for encoded_sequence in encoded_sequences:
             events = []

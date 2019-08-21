@@ -1,13 +1,17 @@
-import os
+import os, random, copy
 import pretty_midi
 import six
-import copy
 from sequence_encoder import SequenceEncoder
+import pdb
 
 class PreprocessingError(Exception):
     pass
 
 class PreprocessingPipeline():
+    
+    #set a random seed
+    SEED = 1811
+
     """
     Pipeline to convert MIDI files to cleaned Piano Midi Note Sequences, split into 
     a more manageable length.
@@ -17,12 +21,11 @@ class PreprocessingPipeline():
     """
     def __init__(self, input_dir, stretch_factors = [0.95, 0.975, 1, 1.025, 1.05],
             split_size = 30, sampling_rate = 125, n_velocity_bins = 32,
-            transpositions = range(-3,4)):
+            transpositions = range(-3,4), training_val_split = 0.9):
         self.input_dir = input_dir
-        self.note_sequences = []
-        #size (in seconds) in which to split midi samples
-        self.split_samples = []
+        self.split_samples = dict()
         self.stretch_factors = stretch_factors
+        #size (in seconds) in which to split midi samples
         self.split_size = split_size
         #In hertz (beats per second), quantize sample timings to this discrete frequency
         #So a sampling rate of 125 hz means a smallest time steps of 8 ms
@@ -31,40 +34,61 @@ class PreprocessingPipeline():
         #this should be an *integer* dividing 128 cleanly: 2,4,8,16,32,64, or 128. 
         self.n_velocity_bins = n_velocity_bins
         self.transpositions = transpositions
+        
+        #Fraction of raw MIDI data that goes to the training set
+        #the remainder goes to validat
+        self.training_val_split = training_val_split
 
         self.encoder = SequenceEncoder(n_time_shift_events = sampling_rate,
                 n_velocity_events = n_velocity_bins)
-        self.encoded_sequences = []
+        self.encoded_sequences = dict()
+
+        random.seed(PreprocessingPipeline.SEED)
 
 
     def run(self):
-        home_dir = os.getcwd()
-        os.chdir(self.input_dir)
-        midis = self.convert_files() 
-        os.chdir(home_dir)
+        midis = self.parse_files(chdir=True) 
         total_time = sum([m.get_end_time() for m in midis])
-        print("{} midis read, or {:.1f} minutes of music"\
+        print("\n{} midis read, or {:.1f} minutes of music"\
                 .format(len(midis), total_time))
 
-        self.get_note_sequences(midis)
-        print("{} note sequences ".format(len(self.note_sequences)))
-        self.stretch_note_sequences()
-        print("{} time-stretched note sequences".format(len(self.note_sequences)))
-        self.split_sequences()
-        self.quantize_samples()
-        print("{} quantized, split samples".format(len(self.split_samples)))
-        self.transpose_samples()
-        print("{} transposed samples".format(len(self.split_samples)))
-        samples = self.split_samples
-        self.encoded_sequences = self.encoder.encode_event_sequences(samples)
+        note_sequences = self.get_note_sequences(midis)
+        print("{} note sequences\n".format(len(note_sequences)))
 
-    def convert_files(self):
+        self.note_sequences = self.partition(note_sequences)
+
+        for mode, sequences in self.note_sequences.items():
+            print(f"Processing {mode} data...")
+            print(f"{len(sequences)} note sequences")
+            if mode == "training":
+                sequences = self.stretch_note_sequences(sequences)
+                print(f"{len(sequences)} stretched note sequences")
+            samples = self.split_sequences(sequences)
+            self.quantize(samples)
+            print(f"{len(samples)} quantized, split samples")
+            if mode == "training":
+                samples = self.transpose_samples(samples)
+                print(f"{len(samples)} transposed samples")
+
+            self.split_samples[mode] = samples
+            self.encoded_sequences[mode] = self.encoder.encode_sequences(samples)
+            print(f"Encoded {mode} sequences!\n")
+
+    def parse_files(self, chdir=False):
+        """
+        Recursively parse all MIDI files in a given directory to 
+        PrettyMidi objects.
+        """
+        if chdir: 
+            home_dir = os.getcwd()
+            os.chdir(self.input_dir)
+
         pretty_midis = []
         folders = [d for d in os.listdir(os.getcwd()) if os.path.isdir(d)]
         if len(folders) > 0:
             for d in folders:
                 os.chdir(d)
-                pretty_midis += convert_files()
+                pretty_midis += parse_files()
                 os.chdir("..")
         midis = [f for f in os.listdir(os.getcwd()) if \
                 (f.endswith(".mid") or f.endswith("midi"))]
@@ -73,12 +97,22 @@ class PreprocessingPipeline():
                 try:
                     midi_str = six.BytesIO(f.read())
                     pretty_midis.append(pretty_midi.PrettyMIDI(midi_str))
-                    print("Successfully parsed {}!".format(m))
+                    print("Successfully parsed {}".format(m))
                 except:
                     print("Could not parse {}".format(m))
+        if chdir:
+            os.chdir(home_dir)
+
         return pretty_midis
 
     def get_note_sequences(self, midis):
+        """
+        Given a list of PrettyMidi objects, extract the Piano track as a list of 
+        Note objects. Calls the "apply_sustain" method to extract the sustain pedal
+        control changes.
+        """
+
+        note_sequences = []
         for m in midis:
             if m.instruments[0].program == 0:
                 piano_data = m.instruments[0]
@@ -88,7 +122,9 @@ class PreprocessingPipeline():
                 raise PreprocessingError("Non-piano midi detected")
             note_sequence = self.apply_sustain(piano_data)
             note_sequence = sorted(note_sequence, key = lambda x: (x.start, x.pitch))
-            self.note_sequences.append(note_sequence)
+            note_sequences.append(note_sequence)
+
+        return note_sequences
 
 
 
@@ -168,9 +204,29 @@ class PreprocessingPipeline():
                     live_notes.remove(note)
         return notes
 
-    def stretch_note_sequences(self):
+    def partition(self, sequences):
+       """
+       Partition a list of Note sequences into a training set and validation set.
+       Returns a dictionary {"training": training_data, "validation": validation_data}
+       """
+       partitioned_sequences = {}
+       random.shuffle(sequences)
+
+       n_training = int(len(sequences) * self.training_val_split)
+       partitioned_sequences['training'] = sequences[:n_training]
+       partitioned_sequences['validation'] = sequences[n_training:]
+
+       return partitioned_sequences
+
+
+
+    def stretch_note_sequences(self, note_sequences):
+        """
+        Stretches tempo (note start and end time) for each sequence in a given list
+        by each of the pipeline's stretch factors. Returns a list of Note sequences.
+        """
         stretched_note_sequences = []
-        for note_sequence in self.note_sequences:
+        for note_sequence in note_sequences:
             for factor in self.stretch_factors:
                 if factor == 1:
                     stretched_note_sequences.append(note_sequence)
@@ -181,14 +237,20 @@ class PreprocessingPipeline():
                     note.end *= factor
                 stretched_note_sequences.append(stretched_sequence)
 
-        self.note_sequences = stretched_note_sequences
+        return stretched_note_sequences
 
 
-    def split_sequences(self):
-        if len(self.note_sequences) == 0:
+    def split_sequences(self, sequences):
+        """
+        Given a list of Note sequences, splits them into samples no longer than 
+        a given length. Returns a list of split samples.
+        """
+
+        samples = []
+        if len(sequences) == 0:
             raise PreprocessingError("No note sequences available to split")
 
-        for note_sequence in self.note_sequences:
+        for note_sequence in sequences:
             sample_length = 0
             sample = []
             i = 0
@@ -203,19 +265,20 @@ class PreprocessingPipeline():
                 else:
                     if len(sample) == 0:
                         raise PreprocessingError("Sample could not be split!")
-                    self.split_samples.append(sample)
+                    samples.append(sample)
                     #sample start should begin with the beginning of the
                     #*next* note, how do I handle this...
                     sample_length = 0
                     sample = []
                 i += 1
+            return samples
 
-    def quantize_samples(self):
+    def quantize(self, samples):
         """
-        Quantize note sequence timing (note start and end) to a smallest timestep,
-        typically 8-10 ms. Quantize note sequence dynamics (note velocity) to a smaller
-        number of bins, on the order of 32. This step ends up freeing up a lot of memory
-        with little audible loss in fidelity.
+        Quantize timing and dynamics in a Note sample in place. This converts continuous
+        time to a discrete, encodable quantity and simplifies input for the model.
+        Quantizes note start/ends to a smallest perceptible timestep (~8ms) and note
+        velocities to a few audibly distinct bins (around 32).
         """
         #define smallest timestep (in seconds)
         try:
@@ -227,7 +290,7 @@ class PreprocessingPipeline():
             velocity_step = 128 // self.n_velocity_bins
         except ZeroDivisionError:
             velocity_step = 0
-        for sample in self.split_samples:
+        for sample in samples:
             for note in sample:
                 if timestep:
                     #quantize timing
@@ -239,9 +302,12 @@ class PreprocessingPipeline():
                     note.velocity = (note.velocity // velocity_step *\
                             velocity_step) + 1
 
-    def transpose_samples(self):
+    def transpose_samples(self, samples):
+        """
+        Transposes the pitch of a sample note by note according to a list of intervals.
+        """
         transposed_samples = []
-        for sample in self.split_samples:
+        for sample in samples:
             for transposition in self.transpositions:
                 if transposition == 0:
                     transposed_samples.append(sample)
@@ -256,7 +322,7 @@ class PreprocessingPipeline():
                     note.pitch = new_pitch
                 transposed_samples.append(transposed_sample)
 
-        self.split_samples = transposed_samples
+        return transposed_samples
 
 
 
