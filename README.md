@@ -1,7 +1,11 @@
 # pno-ai
-This project is about generating piano improvisations with AI. Inspired by [this](https://magenta.tensorflow.org/music-transformer) blog post from Magenta!
+Generate classical piano MIDI performances with AI.
+
+### About
+Inspired by [this](https://magenta.tensorflow.org/music-transformer) blog post from Magenta!
 
 ### Training Data:
+Several years of the International Piano-e-Competition dataset--~1400 performances played by pianists on a Yamaha Disklavier.
 https://magenta.tensorflow.org/datasets/maestro
 
 ### Bibliography:
