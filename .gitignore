@@ -1,4 +1,5 @@
 data/
+demo.py
 *.ipynb_checkpoints
 *.swp
 output/

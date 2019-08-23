@@ -39,7 +39,7 @@ def check_ordering(note_sequences):
         except AssertionError:
             pdb.set_trace()
 
-def check_sample_lengths(split_samples, split_size):
+def check_sample_duration(split_samples, split_size):
     for i in range(len(split_samples)):
         sample = split_samples[i]
         sample_end = sample[-1].end
@@ -50,6 +50,16 @@ def check_sample_lengths(split_samples, split_size):
             print("Error with sample {}; start is {.2f} and end is {.2f}"\
                     .format(i, sample_end, sample_start))
     print("All samples are less than {} seconds in length.".format(split_size))
+
+def check_sequence_lengths(sequences, min_length, max_length):
+    for mode, sequence_set in sequences.items():
+        for i in range(len(sequence_set)):
+            sequence = sequence_set[i]
+            try:
+                assert min_length <= len(sequence) <= max_length
+            except AssertionError:
+                print(f"Error: {mode} sequence {i} is of the wrong length")
+    print("Sequences are the correct length.")
 
 def main():
     pipeline = PreprocessingPipeline(input_dir = "data/test", split_size = 30,
@@ -62,10 +72,10 @@ def main():
     check_ordering(pipeline.split_samples['validation'])
     print("Split samples in order")
     ##write_to_midi(pipeline.note_sequences, "output/test_midis")
-    check_sample_lengths(pipeline.split_samples['training'], 30)
+    check_sample_duration(pipeline.split_samples['training'], 30)
     #write_to_midi(pipeline.split_samples, "output/test_samples", n_to_write=20)
+    check_sequence_lengths(pipeline.encoded_sequences, 32, 512)
     #encoded_sequences = pipeline.encoded_sequences
-    pdb.set_trace()
 
 if __name__ == "__main__":
     main()

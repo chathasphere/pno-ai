@@ -39,7 +39,8 @@ class PreprocessingPipeline():
         self.training_val_split = training_val_split
 
         self.encoder = SequenceEncoder(n_time_shift_events = sampling_rate,
-                n_velocity_events = n_velocity_bins)
+                n_velocity_events = n_velocity_bins, min_events = 32,
+                max_events = 512)
         self.encoded_sequences = dict()
 
         random.seed(PreprocessingPipeline.SEED)

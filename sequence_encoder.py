@@ -19,12 +19,16 @@ class SequenceEncoder():
     """
 
     def __init__(self, n_time_shift_events, n_velocity_events,
-            sequences_per_update=100):
+            sequences_per_update=100, min_events=32, max_events=512):
         self.n_time_shift_events = n_time_shift_events
         self.n_events = 256 + n_time_shift_events + n_velocity_events
         self.timestep = 1 / n_time_shift_events
         self.velocity_bin_size = 128 // n_velocity_events
         self.sequences_per_update = sequences_per_update
+        self.min_events = min_events
+        self.short_count = 0
+        self.max_events = max_events
+        self.long_count = 0
 
     def encode_sequences(self, sample_sequences):
         """
@@ -85,9 +89,27 @@ class SequenceEncoder():
                     current_time = timestamp[0]
                 event_sequence.append(
                         self.event_to_number(timestamp[1], timestamp[2]))
+
+            #check if sequence is too short to keep
+            if self.min_events:
+                if len(event_sequence) < self.min_events:
+                    self.short_count += 1
+                    continue
+            #truncate sequence if necessary
+            if self.max_events:
+                if len(event_sequence) > self.max_events:
+                    event_sequence = event_sequence[:self.max_events]
+                    self.long_count += 1
+
             event_sequences.append(event_sequence)
 
+        if self.short_count > 0:
+            print(f"{self.short_count} sequences discarded due to brevity")
+        if self.long_count > 0:
+            print(f"{self.long_count} sequences truncated due to excessive length.")
+
         return event_sequences
+
                 
     def event_to_number(self, event, value):
         """
