@@ -19,7 +19,7 @@ class SequenceEncoder():
     """
 
     def __init__(self, n_time_shift_events, n_velocity_events,
-            sequences_per_update=100, min_events=32, max_events=512):
+            sequences_per_update=100, min_events=33, max_events=513):
         self.n_time_shift_events = n_time_shift_events
         self.n_events = 256 + n_time_shift_events + n_velocity_events
         self.timestep = 1 / n_time_shift_events
