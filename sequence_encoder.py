@@ -146,7 +146,6 @@ class SequenceEncoder():
         else:
             bin_number = number - 256 - self.n_time_shift_events
             event = "VELOCITY", (bin_number * self.velocity_bin_size) + 1
-
         return event
 
 
@@ -156,8 +155,6 @@ class SequenceEncoder():
             events = []
             for num in encoded_sequence:
                 events.append(self.number_to_event(num))
-            #WARNING DANGER
-            #data (timestamps) already corrupted by this point
             #list of pseudonotes = {'start':x, 'pitch':something, 'velocity':something}
             notes = []
             #on the second pass, add in end time

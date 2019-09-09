@@ -8,34 +8,48 @@ def one_hot(sequence, n_states):
     in the list, return a one-hot encoded tensor of shape (m, n)
     where m is sequence length and n is n_states.
     """
-    return torch.eye(n_states)[sequence,:]
+    if torch.cuda.is_available():
+	return torch.eye(n_states)[sequence,:].cuda()
+    else:
+        return torch.eye(n_states)[sequence,:]
 
+def decode_one_hot(vector):
+    '''
+    Given a one-hot encoded vector, return the non-zero index
+    '''
+    return vector.nonzero().item()
 
-def prepare_batches(sequences, batch_size, n_states, sequence_length):
+def prepare_batches(sequences, batch_size):
     """
-    Converts a list of numeric sequences to one-hot encoded batches of the following shape:
-    (sequence_length x batch_size x n_states),
-    where sequence_length is the length of the longest sequence (this function pads/packs shorter sequences)
-    and n_states is the dimensionality of the one-hot encoding.
-
-    Returns a list of Pytorch tensors.
+    Splits a list of sequences into batches of a fixed size. Each sequence yields an input sequence
+    and a target sequence, with the latter one time step ahead. For example, the sequence "to be or not
+    to be" gives an input sequence of "to be or not to b" and a target sequence of "o be or not to be."
     """
-    sequences = sorted(sequences, key = lambda x: len(x), reverse=True)
-    batches = []
     n_sequences = len(sequences)
     for i in range(0, n_sequences, batch_size):
-        batches.append(sequences[i:i+batch_size])
+        batch = sequences[i:i+batch_size]
+	#needs to be in sorted order for packing batches to work
+	batch = sorted(batch, key = len, reverse=True)
+        input_sequences, target_sequences = [], []
 
-    packed_batches = []
-    for batch in batches:
-        sequence_lengths = [len(s) for s in batch]
-        coded_batch = [one_hot(s, n_states) for s in batch]
+        for sequence in batch:
+            input_sequences.append(sequence[:-1])
+            target_sequences.append(sequence[1:])
 
-        padded_batch = pad_sequence(coded_batch)
-        packed_batches.append(pack_padded_sequence(padded_batch, sequence_lengths))
+        yield input_sequences, target_sequences
 
-    return packed_batches
+def sequences_to_tensor(sequences, is_input, pack_sequences):
+    #TODO figure out how CUDA is to work with target sequences
+    if is_input:
+        tensors = [one_hot(sequence, n_states) for sequence in sequences]
+    else:
+        tensors = [torch.tensor(s) for s in sequences]
 
+    padded_sequences = pad_sequence(tensors, batch_first = not(pack_sequences))
 
-
+    if pack_sequences:
+        sequence_lengths = [len(s) for s in sequences]
+        return packed_padded_sequence(padded_sequences, sequence_lengths)
+    else:
+        return padded_sequences
 

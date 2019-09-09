@@ -51,7 +51,7 @@ class PreprocessingPipeline():
         midis = self.parse_files(chdir=True) 
         total_time = sum([m.get_end_time() for m in midis])
         print("\n{} midis read, or {:.1f} minutes of music"\
-                .format(len(midis), total_time))
+                .format(len(midis), total_time/60))
 
         note_sequences = self.get_note_sequences(midis)
         print("{} note sequences\n".format(len(note_sequences)))
