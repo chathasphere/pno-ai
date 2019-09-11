@@ -89,16 +89,17 @@ class PreprocessingPipeline():
         if len(folders) > 0:
             for d in folders:
                 os.chdir(d)
-                pretty_midis += parse_files()
+                pretty_midis += self.parse_files()
                 os.chdir("..")
         midis = [f for f in os.listdir(os.getcwd()) if \
                 (f.endswith(".mid") or f.endswith("midi"))]
+
         for m in midis:
             with open(m, "rb") as f:
                 try:
                     midi_str = six.BytesIO(f.read())
                     pretty_midis.append(pretty_midi.PrettyMIDI(midi_str))
-                    print("Successfully parsed {}".format(m))
+                    #print("Successfully parsed {}".format(m))
                 except:
                     print("Could not parse {}".format(m))
         if chdir:
