@@ -1,5 +1,6 @@
 import os, random, copy
 import pretty_midi
+from pretty_midi import ControlChange
 import six
 from sequence_encoder import SequenceEncoder
 
@@ -144,11 +145,14 @@ class PreprocessingPipeline():
         notes = copy.deepcopy(piano_data.notes)
         control_changes = piano_data.control_changes
         #sequence of SUSTAIN_ON, SUSTAIN_OFF, NOTE_ON, and NOTE_OFF actions
-        first_sustain_control = next(c for c in control_changes if c.number == 64)
+        first_sustain_control = next((c for c in control_changes if c.number == 64),
+                ControlChange(number=64, value=0, time=0))
+
         if first_sustain_control.value >= 64:
             sustain_position = _SUSTAIN_ON
         else:
             sustain_position = _SUSTAIN_OFF
+        #if for some reason pedal was not touched...
         action_sequence = [(first_sustain_control.time, sustain_position, None)]
         #delete this please
         cleaned_controls = []
@@ -203,7 +207,11 @@ class PreprocessingPipeline():
                     continue
                 else:
                     note = action[2]
-                    live_notes.remove(note)
+                    try:
+                        live_notes.remove(note)
+                    except ValueError:
+                        print("Unexpected note sequence...possible duplicate?")
+                        pass
         return notes
 
     def partition(self, sequences):

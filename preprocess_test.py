@@ -62,7 +62,7 @@ def check_sequence_lengths(sequences, min_length, max_length):
     print("Sequences are the correct length.")
 
 def main():
-    pipeline = PreprocessingPipeline(input_dir = "data/test", split_size = 30,
+    pipeline = PreprocessingPipeline(input_dir = "data/maestro-v2.0.0/2017", split_size = 30,
             n_velocity_bins = 32, training_val_split=.7)
     pipeline.run()
     check_ordering(pipeline.note_sequences['training'])
