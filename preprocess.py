@@ -20,7 +20,8 @@ class PreprocessingPipeline():
     """
     def __init__(self, input_dir, stretch_factors = [0.95, 0.975, 1, 1.025, 1.05],
             split_size = 30, sampling_rate = 125, n_velocity_bins = 32,
-            transpositions = range(-3,4), training_val_split = 0.9):
+            transpositions = range(-3,4), training_val_split = 0.9, 
+            sequence_length = (33, 513)):
         self.input_dir = input_dir
         self.split_samples = dict()
         self.stretch_factors = stretch_factors
@@ -39,8 +40,8 @@ class PreprocessingPipeline():
         self.training_val_split = training_val_split
 
         self.encoder = SequenceEncoder(n_time_shift_events = sampling_rate,
-                n_velocity_events = n_velocity_bins, min_events = 32,
-                max_events = 512)
+                n_velocity_events = n_velocity_bins, min_events = sequence_length[0],
+                max_events = sequence_length[1])
         self.encoded_sequences = dict()
 
         random.seed(PreprocessingPipeline.SEED)
@@ -50,7 +51,7 @@ class PreprocessingPipeline():
         midis = self.parse_files(chdir=True) 
         total_time = sum([m.get_end_time() for m in midis])
         print("\n{} midis read, or {:.1f} minutes of music"\
-                .format(len(midis), total_time))
+                .format(len(midis), total_time/60))
 
         note_sequences = self.get_note_sequences(midis)
         print("{} note sequences\n".format(len(note_sequences)))

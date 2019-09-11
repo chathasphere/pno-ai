@@ -74,8 +74,9 @@ def main():
     ##write_to_midi(pipeline.note_sequences, "output/test_midis")
     check_sample_duration(pipeline.split_samples['training'], 30)
     #write_to_midi(pipeline.split_samples, "output/test_samples", n_to_write=20)
-    check_sequence_lengths(pipeline.encoded_sequences, 32, 512)
-    #encoded_sequences = pipeline.encoded_sequences
+    check_sequence_lengths(pipeline.encoded_sequences, 33, 513)
+    encoded_sequences = pipeline.encoded_sequences
+
 
 if __name__ == "__main__":
     main()
