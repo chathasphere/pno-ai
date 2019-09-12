@@ -12,7 +12,8 @@ def pad_batch(input_sequences, target_sequences, n_states, pack_batches):
 
     input_batch = pad_sequence([one_hot(s, n_states) for s in input_sequences], 
             batch_first=not(pack_batches))
-    target_batch = pad_sequence([torch.tensor(s) for s in target_sequences],
+    target_batch = pad_sequence([torch.tensor(s, dtype=torch.long) 
+        for s in target_sequences],
             batch_first=not(pack_batches))
 
     if pack_batches:
@@ -23,10 +24,11 @@ def pad_batch(input_sequences, target_sequences, n_states, pack_batches):
         x = input_batch
         y = target_batch.flatten()
 
-    return x, y
+    return (x.cuda(), y.cuda()) if torch.cuda.is_available() else (x, y)
 
 def train(model, training_data, validation_data,
-        epochs, lr, evaluate_per, batch_size, pack_batches):
+        epochs, lr, evaluate_per, batch_size, pack_batches,
+        batches_per_print=100):
 
     training_start_time = time.time()
 
@@ -43,6 +45,7 @@ def train(model, training_data, validation_data,
     for e in range(epochs):
         batch_start_time = time.time()
         batch_num = 1
+        averaged_loss = 0
         training_batches = prepare_batches(training_data, batch_size) #returning batches of a given size
         # input and target sequences, latter one time step ahead
         #potentially need some if/else logic to handle hidden states
@@ -70,7 +73,11 @@ def train(model, training_data, validation_data,
             #optimizer takes a step based on gradient
             optimizer.step()
             training_loss = loss.item()
-            #print(f"batch {batch_num}, loss: {training_loss : .2f}")
+            #take average over subset of batch?
+            averaged_loss += training_loss
+            if batch_num % batches_per_print == 0:
+                print(f"batch {batch_num}, loss: {averaged_loss / batches_per_print : .2f}")
+                averaged_loss = 0
             batch_num += 1
 
         print(f"epoch: {e+1}/{epochs} | time: {time.time() - batch_start_time:.0f}s")

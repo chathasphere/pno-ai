@@ -29,9 +29,9 @@ def main():
     sampling_rate = 125
     #determines number of velocity events
     n_velocity_bins = 32
-    pipeline = PreprocessingPipeline(input_dir=input_dir, stretch_factors=[0.95, 0.975, 1, 1.025, 1.05],
+    pipeline = PreprocessingPipeline(input_dir=input_dir, stretch_factors=[0.975, 1, 1.025],
             split_size=30, sampling_rate=sampling_rate, n_velocity_bins=n_velocity_bins,
-            transpositions=range(-3,4), training_val_split=training_val_split, sequence_length=(33,513))
+            transpositions=range(-2,3), training_val_split=training_val_split, max_encoded_length=513, min_encoded_length=33)
 
 
     pipeline.run()
