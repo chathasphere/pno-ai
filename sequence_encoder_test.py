@@ -1,5 +1,6 @@
 from pretty_midi import Note
 from sequence_encoder import SequenceEncoder
+from helpers import vectorize
 import pdb
 
 sample_note_sequence0 = [
@@ -37,8 +38,7 @@ sample_note_sequence1 = [
         ]
 
 
-sample_note_sequence2 = [
-    [Note(start=535.864000, end=536.296000, pitch=81, velocity=77), 
+sample_note_sequence2 = [Note(start=535.864000, end=536.296000, pitch=81, velocity=77), 
     Note(start=535.968000, end=536.368000, pitch=88, velocity=89), 
     Note(start=536.080000, end=536.664000, pitch=79, velocity=77), 
     Note(start=536.176000, end=537.056000, pitch=78, velocity=89), 
@@ -48,14 +48,15 @@ sample_note_sequence2 = [
     Note(start=536.568000, end=537.416000, pitch=76, velocity=77), 
     Note(start=536.664000, end=537.984000, pitch=79, velocity=73), 
     Note(start=536.752000, end=544.648000, pitch=86, velocity=69)]
-    ]
+    
 
 def main():
-    sample = sample_note_sequence2
+    sample = [sample_note_sequence2]
+    v_sample = vectorize(sample_note_sequence2)
 
     encoder = SequenceEncoder(n_time_shift_events = 125, n_velocity_events = 32)
     assert encoder.n_events == 413
-    encoded = encoder.encode_sequences(sample)
+    encoded = encoder.encode_sequences([v_sample])
     decoded = encoder.decode_sequences(encoded)
     
     original_seq = sorted(sample[0], key = lambda x: x.start)

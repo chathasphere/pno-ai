@@ -1,4 +1,5 @@
 from pretty_midi import Note
+import pdb
 
 class SequenceEncoderError(Exception):
     pass
@@ -19,7 +20,7 @@ class SequenceEncoder():
     """
 
     def __init__(self, n_time_shift_events, n_velocity_events,
-            sequences_per_update=1000, min_events=33, max_events=513):
+            sequences_per_update=10000, min_events=33, max_events=513):
         self.n_time_shift_events = n_time_shift_events
         self.n_events = 256 + n_time_shift_events + n_velocity_events
         self.timestep = 1 / n_time_shift_events
@@ -49,10 +50,8 @@ class SequenceEncoder():
             #same time have different velocity
             #current_velocity = 0
             for note in sample_sequences[i]:
-                t0 = note.start
-                t1 = note.end
-                v = note.velocity
-                p = note.pitch
+                #extract start/end time, pitch and velocity
+                t0, t1, p, v = note
                 event_timestamps.append((t0, "VELOCITY", v))
                 #if v != current_velocity:
                 #    event_timestamps.append((t0, "VELOCITY", v))
@@ -91,12 +90,12 @@ class SequenceEncoder():
                         self.event_to_number(timestamp[1], timestamp[2]))
 
             #check if sequence is too short to keep
-            if self.min_events:
+            if self.min_events is not None:
                 if len(event_sequence) < self.min_events:
                     self.short_count += 1
                     continue
             #truncate sequence if necessary
-            if self.max_events:
+            if self.max_events is not None:
                 if len(event_sequence) > self.max_events:
                     event_sequence = event_sequence[:self.max_events]
                     self.long_count += 1

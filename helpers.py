@@ -1,4 +1,24 @@
 import torch
+import numpy as np
+from pretty_midi import Note
+
+def vectorize(sequence):
+    """
+    Converts a list of pretty_midi Note objects into a numpy array of
+    dimension (n_notes x 4)
+    """
+    array = [[note.start, note.end, note.pitch, note.velocity] for
+            note in sequence]
+    return np.asarray(array)
+
+def devectorize(note_array):
+    """
+    Converts a vectorized note sequence into a list of pretty_midi Note
+    objects
+    """
+    return [Note(start = a[0], end = a[1], pitch=a[2],
+        velocity=a[3]) for a in note_array.tolist()]
+
 
 def one_hot(sequence, n_states):
     """

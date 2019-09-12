@@ -1,8 +1,8 @@
-import os
-import pdb
+import os, time, pdb
 from pretty_midi import PrettyMIDI, Instrument
 from preprocess import PreprocessingPipeline
 import pathlib
+from helpers import devectorize
 
 def write_to_midi(note_sequences, output_dir, n_to_write=None):
 
@@ -62,21 +62,29 @@ def check_sequence_lengths(sequences, min_length, max_length):
     print("Sequences are the correct length.")
 
 def main():
-    pipeline = PreprocessingPipeline(input_dir = "data/maestro-v2.0.0/2015", split_size = 30,
-            n_velocity_bins = 32, training_val_split=.7)
+    #try 15 second samples
+    split_size=15
+    pipeline = PreprocessingPipeline(input_dir = "data/maestro-v2.0.0/2015", split_size = split_size,
+            n_velocity_bins = 32, training_val_split=.9)
+    start_time = time.time()
     pipeline.run()
-    check_ordering(pipeline.note_sequences['training'])
-    check_ordering(pipeline.note_sequences['validation'])
+    print(f"runtime: {time.time() - start_time :.2f} s")
+    #you'll need to de-vectorize note_sequences/split_samples
+    #for tests to work
+    note_sequences = [devectorize(ns) for ns in 
+            pipeline.note_sequences['training'][:1000]]
+
+    check_ordering(note_sequences)
     print("Note sequences in order")
-    check_ordering(pipeline.split_samples['training'])
-    check_ordering(pipeline.split_samples['validation'])
+    split_samples = [devectorize(s) for s in 
+            pipeline.split_samples['training'][:1000]]
+    check_ordering(split_samples)
     print("Split samples in order")
     ##write_to_midi(pipeline.note_sequences, "output/test_midis")
-    check_sample_duration(pipeline.split_samples['training'], 30)
+    check_sample_duration(split_samples, split_size)
     #write_to_midi(pipeline.split_samples, "output/test_samples", n_to_write=20)
     check_sequence_lengths(pipeline.encoded_sequences, 33, 513)
     encoded_sequences = pipeline.encoded_sequences
-
 
 if __name__ == "__main__":
     main()

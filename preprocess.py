@@ -3,6 +3,9 @@ import pretty_midi
 from pretty_midi import ControlChange
 import six
 from sequence_encoder import SequenceEncoder
+import pdb
+import numpy as np
+from helpers import vectorize
 
 class PreprocessingError(Exception):
     pass
@@ -22,7 +25,7 @@ class PreprocessingPipeline():
     def __init__(self, input_dir, stretch_factors = [0.95, 0.975, 1, 1.025, 1.05],
             split_size = 30, sampling_rate = 125, n_velocity_bins = 32,
             transpositions = range(-3,4), training_val_split = 0.9, 
-            sequence_length = (33, 513)):
+            max_encoded_length = 512, min_encoded_length = 33):
         self.input_dir = input_dir
         self.split_samples = dict()
         self.stretch_factors = stretch_factors
@@ -41,8 +44,9 @@ class PreprocessingPipeline():
         self.training_val_split = training_val_split
 
         self.encoder = SequenceEncoder(n_time_shift_events = sampling_rate,
-                n_velocity_events = n_velocity_bins, min_events = sequence_length[0],
-                max_events = sequence_length[1])
+                n_velocity_events = n_velocity_bins, 
+                min_events = min_encoded_length,
+                max_events = max_encoded_length)
         self.encoded_sequences = dict()
 
         random.seed(PreprocessingPipeline.SEED)
@@ -56,10 +60,10 @@ class PreprocessingPipeline():
 
         note_sequences = self.get_note_sequences(midis)
         del midis
+        #vectorize note sequences
+        note_sequences = [vectorize(ns) for ns in note_sequences]
         print("{} note sequences extracted\n".format(len(note_sequences)))
-
         self.note_sequences = self.partition(note_sequences)
-        #consider numpy vectorizing here!
         for mode, sequences in self.note_sequences.items():
             print(f"Processing {mode} data...")
             print(f"{len(sequences)} note sequences")
@@ -94,7 +98,7 @@ class PreprocessingPipeline():
                 os.chdir("..")
         midis = [f for f in os.listdir(os.getcwd()) if \
                 (f.endswith(".mid") or f.endswith("midi"))]
-        print(f"Parsing {len(midis)} midi files ...")
+        print(f"Parsing {len(midis)} midi files in {os.getcwd()}...")
         for m in midis:
             with open(m, "rb") as f:
                 try:
@@ -210,7 +214,7 @@ class PreprocessingPipeline():
                     try:
                         live_notes.remove(note)
                     except ValueError:
-                        print("Unexpected note sequence...possible duplicate?")
+                        print("***Unexpected note sequence...possible duplicate?")
                         pass
         return notes
 
@@ -228,8 +232,6 @@ class PreprocessingPipeline():
 
        return partitioned_sequences
 
-
-
     def stretch_note_sequences(self, note_sequences):
         """
         Stretches tempo (note start and end time) for each sequence in a given list
@@ -241,10 +243,11 @@ class PreprocessingPipeline():
                 if factor == 1:
                     stretched_note_sequences.append(note_sequence)
                     continue
-                stretched_sequence = copy.deepcopy(note_sequence)
-                for note in stretched_sequence:
-                    note.start *= factor
-                    note.end *= factor
+                stretched_sequence = np.copy(note_sequence)
+                #stretch note start time
+                stretched_sequence[:,0] *= factor
+                #stretch note end time
+                stretched_sequence[:,1] *= factor
                 stretched_note_sequences.append(stretched_sequence)
 
         return stretched_note_sequences
@@ -265,22 +268,22 @@ class PreprocessingPipeline():
             sample = []
             i = 0
             while i < len(note_sequence):
-                note = copy.deepcopy(note_sequence[i])
+                note = np.copy(note_sequence[i])
                 if sample_length == 0:
-                    sample_start = note.start
-                    if note.end > self.split_size + sample_start:
+                    sample_start = note[0]
+                    if note[1] > self.split_size + sample_start:
                         #prevent case of a zero-length sample
-                        print(f"***Current note has length of more than {self.split_size} seconds...reducing duration")
-                        note.end = sample_start + self.split_size
+                        #print(f"***Current note has length of more than {self.split_size} seconds...reducing duration")
+                        note[1] = sample_start + self.split_size
                     sample.append(note)
                     sample_length = self.split_size
                 else:
-                    if note.end <= sample_start + self.split_size:
+                    if note[1] <= sample_start + self.split_size:
                         sample.append(note)
-                        if note.end > sample_start + sample_length:
-                            sample_length = note.end - sample_start
+                        if note[1] > sample_start + sample_length:
+                            sample_length = note[1] - sample_start
                     else:
-                        samples.append(sample)
+                        samples.append(np.asarray(sample))
                         #sample start should begin with the beginning of the
                         #*next* note, how do I handle this...
                         sample_length = 0
@@ -306,22 +309,22 @@ class PreprocessingPipeline():
         except ZeroDivisionError:
             velocity_step = 0
         for sample in samples:
-            sample_start_time = next(note.start for note in sample)
+            sample_start_time = next((note[0] for note in sample), 0)
             for note in sample:
-                #set start time to zero
-                note.start -= sample_start_time
-                note.end -= sample_start_time
+                #reshift note start and end times to begin at zero
+                note[0] -= sample_start_time
+                note[1] -= sample_start_time
                 #delete this 
-                if note.start < 0 or note.end < 0:
+                if note[0] < 0 or note[1] < 0:
                     raise PreprocessingError
                 if timestep:
                     #quantize timing
-                    note.start = (note.start * self.sampling_rate) // 1 * timestep
-                    note.end = (note.end * self.sampling_rate) // 1 * timestep
+                    note[0] = (note[0] * self.sampling_rate) // 1 * timestep
+                    note[1] = (note[1] * self.sampling_rate) // 1 * timestep
                 if velocity_step:
                     #quantize dynamics
                     #smallest velocity is 1 (otherwise we can't hear it!)
-                    note.velocity = (note.velocity // velocity_step *\
+                    note[3] = (note[3] // velocity_step *\
                             velocity_step) + 1
 
     def transpose_samples(self, samples):
@@ -334,14 +337,11 @@ class PreprocessingPipeline():
                 if transposition == 0:
                     transposed_samples.append(sample)
                     continue
-                transposed_sample = copy.deepcopy(sample)
-                for note in transposed_sample:
-                    new_pitch = note.pitch + transposition
-                    if new_pitch > 127:
-                        new_pitch -= 12
-                    elif new_pitch < 0:
-                        new_pitch += 12
-                    note.pitch = new_pitch
+                transposed_sample = np.copy(sample)
+                #shift pitches in sample by transposition
+                transposed_sample[:,2] += transposition
+                #should I adjust pitches that fall out of the range of 
+                #a piano's 88 keys? going to be pretty uncommon.
                 transposed_samples.append(transposed_sample)
 
         return transposed_samples
