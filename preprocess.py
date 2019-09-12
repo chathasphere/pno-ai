@@ -55,10 +55,11 @@ class PreprocessingPipeline():
                 .format(len(midis), total_time/60))
 
         note_sequences = self.get_note_sequences(midis)
-        print("{} note sequences\n".format(len(note_sequences)))
+        del midis
+        print("{} note sequences extracted\n".format(len(note_sequences)))
 
         self.note_sequences = self.partition(note_sequences)
-
+        #consider numpy vectorizing here!
         for mode, sequences in self.note_sequences.items():
             print(f"Processing {mode} data...")
             print(f"{len(sequences)} note sequences")
@@ -71,7 +72,6 @@ class PreprocessingPipeline():
             if mode == "training":
                 samples = self.transpose_samples(samples)
                 print(f"{len(samples)} transposed samples")
-
             self.split_samples[mode] = samples
             self.encoded_sequences[mode] = self.encoder.encode_sequences(samples)
             print(f"Encoded {mode} sequences!\n")
@@ -94,7 +94,7 @@ class PreprocessingPipeline():
                 os.chdir("..")
         midis = [f for f in os.listdir(os.getcwd()) if \
                 (f.endswith(".mid") or f.endswith("midi"))]
-
+        print(f"Parsing {len(midis)} midi files ...")
         for m in midis:
             with open(m, "rb") as f:
                 try:
@@ -268,20 +268,25 @@ class PreprocessingPipeline():
                 note = copy.deepcopy(note_sequence[i])
                 if sample_length == 0:
                     sample_start = note.start
-                new_length = note.end - sample_start
-                if new_length <= self.split_size:
+                    if note.end > self.split_size + sample_start:
+                        #prevent case of a zero-length sample
+                        print(f"***Current note has length of more than {self.split_size} seconds...reducing duration")
+                        note.end = sample_start + self.split_size
                     sample.append(note)
-                    sample_length = new_length
+                    sample_length = self.split_size
                 else:
-                    if len(sample) == 0:
-                        raise PreprocessingError("Sample could not be split!")
-                    samples.append(sample)
-                    #sample start should begin with the beginning of the
-                    #*next* note, how do I handle this...
-                    sample_length = 0
-                    sample = []
+                    if note.end <= sample_start + self.split_size:
+                        sample.append(note)
+                        if note.end > sample_start + sample_length:
+                            sample_length = note.end - sample_start
+                    else:
+                        samples.append(sample)
+                        #sample start should begin with the beginning of the
+                        #*next* note, how do I handle this...
+                        sample_length = 0
+                        sample = []
                 i += 1
-            return samples
+        return samples
 
     def quantize(self, samples):
         """
