@@ -1,8 +1,5 @@
-data/
-demo.py
 *.ipynb_checkpoints
 *.swp
-output/
 .DS_Store
 deprecated/
 __pycache__/
