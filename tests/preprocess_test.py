@@ -1,5 +1,6 @@
-import os, time, pdb
+import os, time, pdb, sys
 from pretty_midi import PrettyMIDI, Instrument
+sys.path.append("..")
 from preprocess import PreprocessingPipeline
 import pathlib
 from helpers import devectorize
@@ -64,7 +65,7 @@ def check_sequence_lengths(sequences, min_length, max_length):
 def main():
     #try 15 second samples
     split_size=15
-    pipeline = PreprocessingPipeline(input_dir = "data/maestro-v2.0.0/2015", split_size = split_size,
+    pipeline = PreprocessingPipeline(input_dir = "../data/maestro-v2.0.0/2015", split_size = split_size,
             n_velocity_bins = 32, training_val_split=.9)
     start_time = time.time()
     pipeline.run()

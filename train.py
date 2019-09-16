@@ -27,14 +27,17 @@ def pad_batch(input_sequences, target_sequences, n_states, pack_batches):
     return (x.cuda(), y.cuda()) if torch.cuda.is_available() else (x, y)
 
 def train(model, training_data, validation_data,
-        epochs, lr, evaluate_per, batch_size, pack_batches,
-        batches_per_print=100, momentum=0):
+        epochs, optim, evaluate_per, batch_size, pack_batches,
+        batches_per_print=100, lr = .1, momentum=0):
 
     training_start_time = time.time()
 
     model.train()
-    optimizer = torch.optim.SGD(model.parameters(), lr = lr,
+    if optim == "sgd":
+        optimizer = torch.optim.SGD(model.parameters(), lr = lr,
             momentum=momentum)
+    elif optim == "adam":
+        optimizer = torch.optim.Adam(model.parameters())
     loss_function = nn.CrossEntropyLoss()
 
     if torch.cuda.is_available():

@@ -1,7 +1,8 @@
 from pretty_midi import Note
+import sys, pdb
+sys.path.append("..")
 from sequence_encoder import SequenceEncoder
 from helpers import vectorize
-import pdb
 
 sample_note_sequence0 = [
     [Note(start=0.928000, end=1.720000, pitch=54, velocity=25), 
