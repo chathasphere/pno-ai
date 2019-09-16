@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from pretty_midi import Note
+import torch.nn.functional as F
 
 def vectorize(sequence):
     """
@@ -56,18 +57,49 @@ def prepare_batches(sequences, batch_size):
 
         yield input_sequences, target_sequences
 
-#def sequences_to_tensor(sequences, pack_sequences, is_input, one_hot=:
-#    #TODO figure out how CUDA is to work with target sequences
-#    if is_input:
-#        tensors = [one_hot(sequence, n_states) for sequence in sequences]
-#    else:
-#        tensors = [torch.tensor(s) for s in sequences]
-#
-#    padded_sequences = pad_sequence(tensors, batch_first = not(pack_sequences))
-#
-#    if pack_sequences:
-#        sequence_lengths = [len(s) for s in sequences]
-#        return packed_padded_sequence(padded_sequences, sequence_lengths)
-#    else:
-#        return padded_sequences
-#
+def sample(model, sample_length, prime_sequence=[], temperature=1,
+        topk=None):
+    """
+    Generate a MIDI event sequence of a fixed length by randomly sampling from a model's distribution of sequences. Optionally, "seed" the sequence with a
+    prime. A well-trained model will create music that responds to the prime
+    and develops upon it.
+    """
+    #deactivate training mode
+    model.eval()
+    #initialize output
+    output_sequence = prime_sequence
+    if len(prime_sequence) == 0:
+        #if no prime is provided, randomly select a starting event
+        input_sequence = [np.random.randint(model.n_states)]
+    else:
+        input_sequence = prime_sequence
+    #initialize hidden state
+    hx = None
+    for i in range(sample_length):
+        input_tensor = one_hot(input_sequence, model.n_states)
+        #add singleton dimension for the batch
+        input_tensor = input_tensor.unsqueeze(0)
+        #verify batching works
+        out, hx = model(input_tensor, hx, pack_batches=False)
+
+        #out = out.squeeze()
+        probs = F.softmax(out / temperature, dim=-1)
+        #keep the probability distribution for the *next* state only
+        probs = probs[-1,:]
+
+        if topk is not None:
+            #sample from only the top k most probable states
+            values, indices = probs.topk(topk)
+            if torch.cuda.is_available():
+                zeros = torch.zeros(model.n_states).cuda()
+            else:
+                zeros = torch.zeros(model.n_states)
+            probs = torch.scatter(zeros, 0, indices, values)
+
+        next_char_ix = torch.multinomial(probs,1).item()
+
+        input_sequence = [next_char_ix]
+        output_sequence.append(next_char_ix)
+
+    return output_seqeunce
+

@@ -27,9 +27,7 @@ class SequenceEncoder():
         self.velocity_bin_size = 128 // n_velocity_events
         self.sequences_per_update = sequences_per_update
         self.min_events = min_events
-        self.short_count = 0
         self.max_events = max_events
-        self.long_count = 0
 
     def encode_sequences(self, sample_sequences):
         """
@@ -38,6 +36,8 @@ class SequenceEncoder():
         representation.
         """
         event_sequences = []
+        #count how many sequences are discarded/truncated due to length
+        short_count, long_count = 0,0
         n_sequences = len(sample_sequences)
         for i in range(n_sequences):
             if not (i % self.sequences_per_update):
@@ -92,20 +92,20 @@ class SequenceEncoder():
             #check if sequence is too short to keep
             if self.min_events is not None:
                 if len(event_sequence) < self.min_events:
-                    self.short_count += 1
+                    short_count += 1
                     continue
             #truncate sequence if necessary
             if self.max_events is not None:
                 if len(event_sequence) > self.max_events:
                     event_sequence = event_sequence[:self.max_events]
-                    self.long_count += 1
+                    long_count += 1
 
             event_sequences.append(event_sequence)
 
-        if self.short_count > 0:
-            print(f"{self.short_count} sequences discarded due to brevity")
-        if self.long_count > 0:
-            print(f"{self.long_count} sequences truncated due to excessive length.")
+        if short_count > 0:
+            print(f"{short_count} sequences discarded due to brevity")
+        if long_count > 0:
+            print(f"{long_count} sequences truncated due to excessive length.")
 
         return event_sequences
 

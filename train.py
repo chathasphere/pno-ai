@@ -45,15 +45,12 @@ def train(model, training_data, validation_data,
 
     #start a list of mini-batch training losses
     training_losses = []
+    hx = None #initialize hidden state (defaults to zeros)
     for e in range(epochs):
         batch_start_time = time.time()
         batch_num = 1
         averaged_loss = 0
         training_batches = prepare_batches(training_data, batch_size) #returning batches of a given size
-        # input and target sequences, latter one time step ahead
-        #potentially need some if/else logic to handle hidden states
-        hx = None #this is the hidden state, None means: initializes to zeros
-        # hidden state is the "internal representation" of the sequence
 
         for input_sequences, target_sequences in training_batches:
 
