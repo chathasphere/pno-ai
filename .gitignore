@@ -6,3 +6,4 @@ output/
 .DS_Store
 deprecated/
 __pycache__/
+experiments.txt

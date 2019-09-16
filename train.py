@@ -43,6 +43,8 @@ def train(model, training_data, validation_data,
     else:
         print("GPU not available, CPU used")
 
+    #start a list of mini-batch training losses
+    training_losses = []
     for e in range(epochs):
         batch_start_time = time.time()
         batch_num = 1
@@ -74,6 +76,7 @@ def train(model, training_data, validation_data,
             #optimizer takes a step based on gradient
             optimizer.step()
             training_loss = loss.item()
+            training_losses.append(training_loss)
             #take average over subset of batch?
             averaged_loss += training_loss
             if batch_num % batches_per_print == 0:
@@ -82,9 +85,6 @@ def train(model, training_data, validation_data,
             batch_num += 1
 
         print(f"epoch: {e+1}/{epochs} | time: {time.time() - batch_start_time:.0f}s")
-        #TODO this training loss calculation is problematic,
-        #the last average is more accurate.
-        print(f"training loss: {training_loss :.2f}")
         shuffle(training_data)
 
         if (e + 1) % evaluate_per == 0:
@@ -111,4 +111,6 @@ def train(model, training_data, validation_data,
             model.train()
             print(f"validation loss: {val_loss / n_batches:.2f}")
             shuffle(validation_data)
+
+    return training_losses
 
