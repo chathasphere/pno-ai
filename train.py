@@ -28,12 +28,13 @@ def pad_batch(input_sequences, target_sequences, n_states, pack_batches):
 
 def train(model, training_data, validation_data,
         epochs, lr, evaluate_per, batch_size, pack_batches,
-        batches_per_print=100):
+        batches_per_print=100, momentum=0):
 
     training_start_time = time.time()
 
     model.train()
-    optimizer = torch.optim.SGD(model.parameters(), lr = lr) 
+    optimizer = torch.optim.SGD(model.parameters(), lr = lr,
+            momentum=momentum)
     loss_function = nn.CrossEntropyLoss()
 
     if torch.cuda.is_available():
@@ -81,6 +82,8 @@ def train(model, training_data, validation_data,
             batch_num += 1
 
         print(f"epoch: {e+1}/{epochs} | time: {time.time() - batch_start_time:.0f}s")
+        #TODO this training loss calculation is problematic,
+        #the last average is more accurate.
         print(f"training loss: {training_loss :.2f}")
         shuffle(training_data)
 
