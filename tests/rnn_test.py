@@ -4,7 +4,7 @@ sys.path.append("..")
 from preprocess import PreprocessingPipeline
 from train import train
 from model import MusicRNN
-from helpers import sample
+from generate import sample
 
 def main():
 

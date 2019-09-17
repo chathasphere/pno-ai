@@ -147,56 +147,93 @@ class SequenceEncoder():
             event = "VELOCITY", (bin_number * self.velocity_bin_size) + 1
         return event
 
-
     def decode_sequences(self, encoded_sequences):
         note_sequences = []
         for encoded_sequence in encoded_sequences:
-            events = []
-            for num in encoded_sequence:
-                events.append(self.number_to_event(num))
-            #list of pseudonotes = {'start':x, 'pitch':something, 'velocity':something}
-            notes = []
-            #on the second pass, add in end time
-            note_ons = []
-            note_offs = []
-            global_time = 0
-            current_velocity = 0
-            for event, value in events:
-                #check event type
-                if event == "TIME_SHIFT":
-                    global_time += 0.008 * value
-                    global_time = round(global_time, 5)
-
-                elif event == "VELOCITY":
-                    current_velocity = value
-                
-                elif event == "NOTE_OFF":
-                    #eventually we'll sort this by timestamp and work thru
-                    note_offs.append({"pitch": value, "end": global_time})
-                
-                elif event == "NOTE_ON":
-                    #it's a NOTE_ON!
-                    #value is pitch 
-                    note_ons.append({"start": global_time, 
-                        "pitch": value, "velocity": current_velocity})
-                else:
-                    raise SequenceEncoderError("you fool!")
-            #second pass: zip up notes with their note-offs
-            while len(note_ons) > 0:
-                note_on = note_ons[0]
-                pitch = note_on['pitch']
-                #this assumes everything is sorted nicely!
-                note_off = next(n for n in note_offs if n['pitch'] == pitch)
-                note = Note(start = note_on['start'], end = note_off['end'],
-                        pitch = pitch, velocity = note_on['velocity'])
-                notes.append(note)
-                note_ons.remove(note_on)
-                note_offs.remove(note_off)
-            
-            note_sequences.append(notes)
+            note_sequences.append(self.decode_sequence(encoded_sequence))
 
         return note_sequences
 
+    def decode_sequence(self, encoded_sequence, stuck_note_duration=None, keep_ghosts=False, verbose=False):
+
+        events = []
+        for num in encoded_sequence:
+            events.append(self.number_to_event(num))
+        #list of pseudonotes = {'start':x, 'pitch':something, 'velocity':something}
+        notes = []
+        #on the second pass, add in end time
+        note_ons = []
+        note_offs = []
+        global_time = 0
+        current_velocity = 0
+        for event, value in events:
+            #check event type
+            if event == "TIME_SHIFT":
+                global_time += 0.008 * value
+                global_time = round(global_time, 5)
+
+            elif event == "VELOCITY":
+                current_velocity = value
+            
+            elif event == "NOTE_OFF":
+                #eventually we'll sort this by timestamp and work thru
+                note_offs.append({"pitch": value, "end": global_time})
+            
+            elif event == "NOTE_ON":
+                #it's a NOTE_ON!
+                #value is pitch 
+                note_ons.append({"start": global_time, 
+                    "pitch": value, "velocity": current_velocity})
+            else:
+                raise SequenceEncoderError("you fool!")
+
+        #keep a count of notes that are missing an end time (stuck notes)
+        #----default behavior is to ignore them. 
+        stuck_notes = 0
+        
+        #keep a count of notes assigned end times *before* their start times (ghost notes)
+        #----default behavior is to ignore them
+        ghost_notes = 0
+
+
+        #Zip up notes with corresponding note-off events
+        while len(note_ons) > 0:
+            note_on = note_ons[0]
+            pitch = note_on['pitch']
+            #this assumes everything is sorted nicely!
+            note_off = next((n for n in note_offs if n['pitch'] == pitch), None)
+            if note_off == None:
+                stuck_notes += 1
+                if stuck_note_duration is None:
+                    note_ons.remove(note_on)
+                    continue
+                else:
+                    note_off = {"pitch": pitch, "end": note_on['start'] + stuck_note_duration}
+            else:
+                note_offs.remove(note_off)
+
+            if note_off['end'] < note_on['start']:
+                ghost_notes += 1
+                if keep_ghosts:
+                    #reverse start and end (and see what happens...!)
+                    new_end = note_on['start']
+                    new_start = note_off['end']
+                    note_on['start'] = new_start
+                    note_off['end'] = new_end
+                else:
+                    note_ons.remove(note_on)
+                    continue
+
+            note = Note(start = note_on['start'], end = note_off['end'],
+                    pitch = pitch, velocity = note_on['velocity'])
+            notes.append(note)
+            note_ons.remove(note_on)
+
+        if verbose:
+            print(f"{stuck_notes} notes missing an end-time...")
+            print(f"{ghost_notes} had an end-time precede their start-time")
+
+        return notes
             
 
 
