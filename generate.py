@@ -1,5 +1,5 @@
 import argparse, pdb, pathlib, uuid
-from model import MusicRNN
+import model
 from sequence_encoder import SequenceEncoder
 import torch
 import torch.nn.functional as F
@@ -68,42 +68,52 @@ def sample(model, sample_length, prime_sequence=[], temperature=1,
     return output_sequence
 
 
+#SAVE INFORMATION ON MODELS HERE
+#should this be a yaml? perhaps.
+MODEL_DICT = {
+        'rnn': {'path': "saved_models/rnn_20190916", 
+            'model': model.MusicRNN, 
+            'args': {'n_states': 413, 'hidden_size': 512, 'n_rnn_layers': 3},
+            'n_velocity_events': 32,
+            'n_time_shift_events': 125}
+        }
 
 
 def main():
     parser = argparse.ArgumentParser("Script to generate MIDI tracks by sampling from a trained model.")
 
-    parser.add_argument("--model_path", type=str, 
-            help="path to saved state dict of a trained Pytorch model")
+    parser.add_argument("--model_key", type=str, 
+            help="key to MODEL_DICT, allowing access to the path of a saved model & its params")
     parser.add_argument("--sample_length", type=int, default=512,
             help="number of events to generate")
 
     args=parser.parse_args()
 
+    model_key = args.model_key
+
     try:
-        state = torch.load(args.model_path)
+        state = torch.load(MODEL_DICT[model_key]['path'])
     except RuntimeError:
-        state = torch.load(args.model_path, map_location="cpu")
+        state = torch.load(MODEL_DICT[model_key]['path'], map_location="cpu")
     
-    #TODO load a configuration in rather than hardcode this
-    n_velocity_events = 32
-    n_time_shift_events = 125
-    n_states = 256 + n_velocity_events + n_time_shift_events
+    n_velocity_events = MODEL_DICT[model_key]['n_velocity_events']
+    n_time_shift_events = MODEL_DICT[model_key]['n_time_shift_events']
 
     decoder = SequenceEncoder(n_time_shift_events, n_velocity_events)
-
-    model = MusicRNN(n_states, 512, n_rnn_layers=3)
+    
+    model_args = MODEL_DICT[model_key]['args']
+    model = MODEL_DICT[model_key]['model'](**model_args)
     model.load_state_dict(state)
 
-    #temps = [1, .75, .5]
     #temps = [1, .9, .8, .7, .6, .5] 
-    temps = [1]
+    temps = [1.25, 1, .75, .5]
 
     #topks = [None, 100, 50]
     topks = [None]
 
     trial_key = str(uuid.uuid4())[:6]
     n_trials = 3
+
     #TODO take in a priming sequence
     for temp in temps:
         for topk in topks:
@@ -119,7 +129,7 @@ def main():
 
             #note_sequence3 = decoder.decode_sequence(output_sequence, keep_ghosts=True)
 
-                output_dir = f"output/rnn/{trial_key}/"
+                output_dir = f"output/{model_key}/{trial_key}/"
                 file_name = f"sample{i+1}_{temp}_{topk}"
                 write_midi(note_sequence, output_dir, file_name)
             #write_midi(note_sequence, output_dir, "sticky_notes")
