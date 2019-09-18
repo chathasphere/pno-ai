@@ -7,6 +7,8 @@ import numpy as np
 from helpers import one_hot
 from pretty_midi import PrettyMIDI, Instrument
 
+class GeneratorError(Exception):
+    pass
 
 def write_midi(note_sequence, output_dir, filename):
 
@@ -86,10 +88,18 @@ def main():
             help="key to MODEL_DICT, allowing access to the path of a saved model & its params")
     parser.add_argument("--sample_length", type=int, default=512,
             help="number of events to generate")
+    parser.add_argument("--temps", nargs="+", type=float, default=1.0,
+            help="space-separated list of temperatures to use when sampling")
+    parser.add_argument("--topks", nargs="+", type=int,
+            help="space-separated list of topks to use when sampling")
+    parser.add_argument("--n_trials", type=int, default=5,
+            help="number of MIDI samples to generate per experiment")
 
     args=parser.parse_args()
 
     model_key = args.model_key
+    if MODEL_DICT.get(model_key) is None:
+        raise GeneratorError("model key not supplied or not recognized!")
 
     try:
         state = torch.load(MODEL_DICT[model_key]['path'])
@@ -105,14 +115,14 @@ def main():
     model = MODEL_DICT[model_key]['model'](**model_args)
     model.load_state_dict(state)
 
-    #temps = [1, .9, .8, .7, .6, .5] 
-    temps = [1.25, 1, .75, .5]
+    temps = args.temps
 
-    #topks = [None, 100, 50]
-    topks = [None]
+    topks = args.topks
+    if topks is None:
+        topks = [None]
 
     trial_key = str(uuid.uuid4())[:6]
-    n_trials = 3
+    n_trials = args.n_trials
 
     #TODO take in a priming sequence
     for temp in temps:
@@ -123,7 +133,7 @@ def main():
                         sample_length=args.sample_length, temperature=temp, 
                         topk=topk)
                 note_sequence = decoder.decode_sequence(output_sequence, 
-                    verbose=True, stuck_note_duration=1)
+                    verbose=True, stuck_note_duration=3)
 
             #note_sequence2 = decoder.decode_sequence(output_sequence, stuck_note_duration=10)
 
