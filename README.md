@@ -1,7 +1,8 @@
 # pno-ai
-Piano MIDIs Generated with Deep Learning. Written in Python/Pytorch.
+Pianistic Neuralnets Offer Aleatoric Improvisations
 
 ### About
+A deep learning project written in Python & Pytorch to generate piano MIDI tracks.<br>
 Transform Piano MIDI data into "Event Sequences," a sparse MIDI representation giving instructions to play notes, release them, change dynamics, and shift time. This encoding is an efficient, computer-readable format for expressive piano music. After training sequence-to-sequence neural networks (such as RNNs or Transformers) on a preprocessed dataset, you can generate random samples of "learned" music with the `generate.py` file.
 
 Inspired by [this](https://magenta.tensorflow.org/music-transformer) blog post from Magenta.
