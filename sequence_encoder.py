@@ -148,6 +148,9 @@ class SequenceEncoder():
         return event
 
     def decode_sequences(self, encoded_sequences):
+        """
+        Given a list of encoded sequences, decode each of them and return a list of pretty_midi Note sequences.
+        """
         note_sequences = []
         for encoded_sequence in encoded_sequences:
             note_sequences.append(self.decode_sequence(encoded_sequence))
@@ -155,7 +158,15 @@ class SequenceEncoder():
         return note_sequences
 
     def decode_sequence(self, encoded_sequence, stuck_note_duration=None, keep_ghosts=False, verbose=False):
+        """
+        Takes in an encoded event sequence (sparse numerical representation) and transforms it back into a pretty_midi Note sequence. Randomly-generated encoded sequences, such as produced by the generation script, can have some unusual traits such as notes without a provided end time. Contains logic to handle these pathological notes.
 
+        Args:
+            encoded_sequence (list): List of events encoded as integers
+            stuck_note_duration (int or None): if defined, for recovered notes missing an endtime, give them a fixed duration (as number of seconds held)
+            keep_ghosts (bool): if true, when the decoding algorithm recovers notes with an end time preceding their start time, keep them by swapping start and end. If false, discard the "ghost" notes
+            verbose (bool): If true, print results on how many stuck notes and ghost notes are detected.
+        """
         events = []
         for num in encoded_sequence:
             events.append(self.number_to_event(num))

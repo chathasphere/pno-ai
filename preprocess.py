@@ -11,16 +11,18 @@ class PreprocessingError(Exception):
     pass
 
 class PreprocessingPipeline():
-    
     #set a random seed
     SEED = 1811
-
     """
     Pipeline to convert MIDI files to cleaned Piano Midi Note Sequences, split into 
     a more manageable length.
     Applies any sustain pedal activity to extend note lengths. Optionally augments
     the data by transposing pitch and/or stretching sample speed. Optionally quantizes
     timing and/or dynamics into smaller bins.
+
+    Attributes:
+        self.split_samples (dict of lists): when the pipeline is run, has two keys, "training" and "validation," each holding a list of split MIDI note sequences.
+        self.encoded_sequences (dict of lists): Keys are "training" and "validation." Each holds a list of encoded event sequences, a sparse numeric representation of a MIDI sample.
     """
     def __init__(self, input_dir, stretch_factors = [0.95, 0.975, 1, 1.025, 1.05],
             split_size = 30, sampling_rate = 125, n_velocity_bins = 32,
@@ -51,14 +53,33 @@ class PreprocessingPipeline():
 
         random.seed(PreprocessingPipeline.SEED)
 
+        """
+        Args:
+            input_dir (str): path to input directory. All .midi or .mid files in this directory will get processed.
+            stretch_factors (list of float): List of constants by which note end times and start times will be multiplied. A way to augment data.
+            split_size (int): Max length, in seconds, of samples into which longer MIDI note sequences are split.
+            sampling_rate (int): How many subdivisions of 1,000 milliseconds to quantize note timings into. E.g. a sampling rate of 100 will mean end and start times are rounded to the nearest 0.01 second.
+            n_velocity_bins (int): Quantize 128 Midi velocities (amplitudes) into this many bins: e.g. 32 velocity bins mean note velocities are rounded to the nearest multiple of 4.
+            transpositions (iterator of ints): Transpose note pitches up/down by intervals (number of half steps) in this iterator. Augments a dataset with transposed copies.
+            training_val_split (float): Number between 0 and 1 defining the proportion of raw data going to the training set. The rest goes to validation.
+            max_encoded_length (int): Truncate encoded samples containing more
+            events than this number.
+            min_encoded_length (int): Discard encoded samples containing fewer events than this number.
+        """
+
 
     def run(self):
+        """
+        Main pipeline call...parse midis, split into test and validation sets,
+        augment, quantize, sample, and encode as event sequences. 
+        """
         midis = self.parse_files(chdir=True) 
         total_time = sum([m.get_end_time() for m in midis])
         print("\n{} midis read, or {:.1f} minutes of music"\
                 .format(len(midis), total_time/60))
 
         note_sequences = self.get_note_sequences(midis)
+        pdb.set_trace()
         del midis
         #vectorize note sequences
         note_sequences = [vectorize(ns) for ns in note_sequences]

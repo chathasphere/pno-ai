@@ -1,4 +1,4 @@
-import argparse, pdb, pathlib, uuid
+import argparse, pathlib, uuid, subprocess
 import model
 from sequence_encoder import SequenceEncoder
 import torch
@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import numpy as np
 from helpers import one_hot
 from pretty_midi import PrettyMIDI, Instrument
+import midi_input
 
 class GeneratorError(Exception):
     pass
@@ -43,10 +44,11 @@ def sample(model, sample_length, prime_sequence=[], temperature=1,
     hx = None
     for i in range(sample_length):
         input_tensor = one_hot(input_sequence, model.n_states)
-        #add singleton dimension for the batch
-        input_tensor = input_tensor.unsqueeze(0)
+        #add singleton dimension for the batch (in the middle)
+        input_tensor = input_tensor.unsqueeze(1)
         #verify batching works
-        out, hx = model(input_tensor, hx, pack_batches=False)
+        out, hx = model(input_tensor, hx, pack_batches=True)
+        hx = tuple(h.detach() for h in hx)
 
         #out = out.squeeze()
         probs = F.softmax(out / temperature, dim=-1)
@@ -94,6 +96,13 @@ def main():
             help="space-separated list of topks to use when sampling")
     parser.add_argument("--n_trials", type=int, default=5,
             help="number of MIDI samples to generate per experiment")
+    parser.add_argument("--live_input", action='store_true', default = False,
+            help="if true, take in a seed from a MIDI input controller")
+
+    parser.add_argument("--play_live", action='store_true', default=False,
+            help="play sample(s) at end of script if true")
+    parser.add_argument("--keep_ghosts", action='store_true', default=False)
+    parser.add_argument("--stuck_note_duration", type=int, default=0)
 
     args=parser.parse_args()
 
@@ -110,7 +119,15 @@ def main():
     n_time_shift_events = MODEL_DICT[model_key]['n_time_shift_events']
 
     decoder = SequenceEncoder(n_time_shift_events, n_velocity_events)
-    
+
+    if args.live_input:
+        print("Expecting a midi input...")
+        note_sequence = midi_input.read(n_velocity_events, n_time_shift_events)
+        prime_sequence = decoder.encode_sequences([note_sequence])[0]
+
+    else:
+        prime_sequence = []
+
     model_args = MODEL_DICT[model_key]['args']
     model = MODEL_DICT[model_key]['model'](**model_args)
     model.load_state_dict(state)
@@ -124,26 +141,34 @@ def main():
     trial_key = str(uuid.uuid4())[:6]
     n_trials = args.n_trials
 
+    keep_ghosts = args.keep_ghosts
+    stuck_note_duration = None if args.stuck_note_duration == 0 else args.stuck_note_duration
+
     #TODO take in a priming sequence
     for temp in temps:
-        for topk in topks:
-            print(f"sampling temp={temp}, topk={topk}...")
-            for i in range(n_trials):
-                output_sequence = sample(model, prime_sequence = [],
-                        sample_length=args.sample_length, temperature=temp, 
-                        topk=topk)
-                note_sequence = decoder.decode_sequence(output_sequence, 
-                    verbose=True, stuck_note_duration=3)
+        print(f"sampling temp={temp}")
+        note_sequence = []
+        for i in range(n_trials):
+            output_sequence = sample(model, prime_sequence = prime_sequence,
+                    sample_length=args.sample_length, temperature=temp)
+            note_sequence = decoder.decode_sequence(output_sequence, 
+                verbose=True, stuck_note_duration=3)
 
-            #note_sequence2 = decoder.decode_sequence(output_sequence, stuck_note_duration=10)
 
-            #note_sequence3 = decoder.decode_sequence(output_sequence, keep_ghosts=True)
+        #note_sequence2 = decoder.decode_sequence(output_sequence, stuck_note_duration=10)
 
-                output_dir = f"output/{model_key}/{trial_key}/"
-                file_name = f"sample{i+1}_{temp}_{topk}"
-                write_midi(note_sequence, output_dir, file_name)
-            #write_midi(note_sequence, output_dir, "sticky_notes")
-            #write_midi(note_sequence, output_dir, "ghost_notes")
+        #note_sequence3 = decoder.decode_sequence(output_sequence, keep_ghosts=True)
+            output_dir = f"output/{model_key}/{trial_key}/"
+            file_name = f"sample{i+1}_{temp}"
+            write_midi(note_sequence, output_dir, file_name)
+        #write_midi(note_sequence, output_dir, "sticky_notes")
+        #write_midi(note_sequence, output_dir, "ghost_notes")
+
+    for temp in temps:      
+        try:
+            subprocess.run(['timidity', f"output/{model_key}/{trial_key}/sample{i+1}_{temp}.midi"])
+        except KeyboardInterrupt:
+            continue
 
 if __name__ == "__main__":
     main()
