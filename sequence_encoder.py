@@ -1,5 +1,4 @@
 from pretty_midi import Note
-import pdb
 
 class SequenceEncoderError(Exception):
     pass

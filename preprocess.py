@@ -3,7 +3,6 @@ import pretty_midi
 from pretty_midi import ControlChange
 import six
 from sequence_encoder import SequenceEncoder
-import pdb
 import numpy as np
 from helpers import vectorize
 
@@ -79,7 +78,6 @@ class PreprocessingPipeline():
                 .format(len(midis), total_time/60))
 
         note_sequences = self.get_note_sequences(midis)
-        pdb.set_trace()
         del midis
         #vectorize note sequences
         note_sequences = [vectorize(ns) for ns in note_sequences]
