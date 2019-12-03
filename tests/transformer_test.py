@@ -1,9 +1,8 @@
 import sys
 sys.path.append("..")
-
 from preprocess import PreprocessingPipeline
 from train import train
-from model import MusicRNN
+from model import MusicTransformer
 from generate import sample
 
 def main():
@@ -18,22 +17,23 @@ def main():
 
 
     #set up data pipeline
+    seq_length = 128
+    padding = 0
+    padded_length = seq_length + padding
     pipeline = PreprocessingPipeline(input_dir=input_dir, stretch_factors=[0.975, 1, 1.025],
-            split_size=15, sampling_rate=sampling_rate, n_velocity_bins=n_velocity_bins,
-            transpositions=range(-2,3), training_val_split=training_val_split, max_encoded_length=513, min_encoded_length=33)
+            split_size=30, sampling_rate=sampling_rate, n_velocity_bins=n_velocity_bins,
+            transpositions=range(-2,3), training_val_split=training_val_split, max_encoded_length=seq_length+1, min_encoded_length=129)
 
     pipeline.run()
     training_sequences = pipeline.encoded_sequences['training']
     validation_sequences = pipeline.encoded_sequences['validation']
     n_states = 256 + sampling_rate + n_velocity_bins
-    hidden_size = 512
-    pack_batches = True
     batch_size = 20
-    rnn = MusicRNN(n_states, hidden_size, batch_first = not(pack_batches))
-    train(rnn, training_sequences, validation_sequences, epochs = 2, 
-            evaluate_per=1, batch_size=batch_size,
-            pack_batches=pack_batches, batches_per_print=1)
-    sample(rnn, sample_length=10)
+    optim="adam"
+    transformer = MusicTransformer(n_states)
+    train(transformer, training_sequences, validation_sequences, epochs = 2, padded_length=padded_length,
+            evaluate_per=1, batch_size=batch_size, batches_per_print=1)
 
-if __name__ == "__main__":
+
+if __name__== "__main__":
     main()

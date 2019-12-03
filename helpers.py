@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from pretty_midi import Note
 import torch.nn.functional as F
+import copy
 
 def vectorize(sequence):
     """
@@ -56,4 +57,9 @@ def prepare_batches(sequences, batch_size):
             target_sequences.append(sequence[1:])
 
         yield input_sequences, target_sequences
+
+def clones(module, N):
+    "Clone N identical layers of a module"
+    return torch.nn.ModuleList([copy.deepcopy(module) for i in range(N)])
+
 
