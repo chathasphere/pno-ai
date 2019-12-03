@@ -29,10 +29,9 @@ def main():
     hidden_size = 512
     pack_batches = True
     batch_size = 20
-    optim="sgd"
     rnn = MusicRNN(n_states, hidden_size, batch_first = not(pack_batches))
     train(rnn, training_sequences, validation_sequences, epochs = 2, 
-            optim=optim, evaluate_per=1, batch_size=batch_size,
+            evaluate_per=1, batch_size=batch_size,
             pack_batches=pack_batches, batches_per_print=1)
     sample(rnn, sample_length=10)
 

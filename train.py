@@ -3,41 +3,44 @@ import torch
 import torch.nn as nn
 import time
 from random import shuffle
-from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 
 
-def pad_batch(input_sequences, target_sequences, n_states, pack_batches):
+def pad_batch(input_sequences, target_sequences, n_states,
+        padded_length = 256):
 
     sequence_lengths = [len(s) for s in input_sequences]
+    batch_size = len(input_sequences)
 
-    input_batch = pad_sequence([one_hot(s, n_states) for s in input_sequences], 
-            batch_first=not(pack_batches))
-    target_batch = pad_sequence([torch.tensor(s, dtype=torch.long) 
-        for s in target_sequences],
-            batch_first=not(pack_batches))
+    x = torch.zeros(batch_size, padded_length, dtype=torch.long)
+    #right shape??? i don't think so
+    input_mask = torch.tensor(x)
+    y = torch.zeros(batch_size, padded_length, dtype=torch.long)
+    target_mask = torch.tensor(y)
 
-    if pack_batches:
-        x = pack_padded_sequence(input_batch, sequence_lengths)
-        y = pack_padded_sequence(target_batch, sequence_lengths)[0]
+    for i, sequence in enumerate(input_sequences):
+        seq_length = sequence_lengths[i]
+        #copy over input sequence data with zero-padding
+        #cast to long to be embedded into model's hidden dimension
+        x[i, :seq_length] = torch.Tensor(sequence).unsqueeze(0)
+        ##input mask: 0 for padded entries, else 1
+        #sequence_mask = sequence.sum(1).unsqueeze(1).repeat(1, n_states)
+        #input_mask[i, :seq_length, :] = sequence_mask.unsqueeze(0)
 
-    else:
-        x = input_batch
-        y = target_batch.flatten()
+
+    for i, sequence in enumerate(target_sequences):
+        seq_length = sequence_lengths[i]
+        y[i, :seq_length] = torch.Tensor(sequence).unsqueeze(0)
 
     return (x.cuda(), y.cuda()) if torch.cuda.is_available() else (x, y)
 
 def train(model, training_data, validation_data,
-        epochs, optim, evaluate_per, batch_size, pack_batches,
-        batches_per_print=100, lr = .1, momentum=0):
+        epochs, evaluate_per, batch_size, padded_length,
+        batches_per_print=100):
 
     training_start_time = time.time()
 
     model.train()
-    if optim == "sgd":
-        optimizer = torch.optim.SGD(model.parameters(), lr = lr,
-            momentum=momentum)
-    elif optim == "adam":
-        optimizer = torch.optim.Adam(model.parameters())
+    optimizer = torch.optim.Adam(model.parameters())
     loss_function = nn.CrossEntropyLoss()
 
     if torch.cuda.is_available():
@@ -48,7 +51,6 @@ def train(model, training_data, validation_data,
 
     #start a list of mini-batch training losses
     training_losses = []
-    hx = None #initialize hidden state (defaults to zeros)
     for e in range(epochs):
         batch_start_time = time.time()
         batch_num = 1
@@ -61,14 +63,14 @@ def train(model, training_data, validation_data,
             if len(input_sequences) != batch_size:
                 continue
 
-            x, y = pad_batch(input_sequences, target_sequences, model.n_states, pack_batches)
-
-            y_hat, hx = model(x, hx, pack_batches)
+            x, y = pad_batch(input_sequences, target_sequences, model.n_states, padded_length)
+            
+            y_hat = model(x, y).transpose(1,2)
+            #shape: (batch_size, n_states, seq_length)
 
             loss = loss_function(y_hat, y)
 
             #detach hidden state from the computation graph; we don't need its gradient
-            hx = tuple(h.detach() for h in hx)
             #clear old gradients from previous step
             model.zero_grad()
             #compute derivative of loss w/r/t parameters
@@ -101,9 +103,9 @@ def train(model, training_data, validation_data,
                 if len(input_sequences) != batch_size:
                     continue
 
-                x, y = pad_batch(input_sequences, target_sequences, model.n_states, pack_batches)
+                x, y = pad_batch(input_sequences, target_sequences, model.n_states, padded_length)
 
-                y_hat, hx = model(x, hx, pack_batches)
+                y_hat = model(x,y).transpose(1,2)
                 loss = loss_function(y_hat, y)
                 val_loss += loss.item()
                 n_batches += 1

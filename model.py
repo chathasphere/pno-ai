@@ -4,6 +4,8 @@ import torch.nn.functional as F
 from torch.nn.modules.rnn import PackedSequence
 from helpers import clones
 from attention import MultiheadedAttention
+import math
+import pdb
 
 class MusicRNN(nn.Module):
     """
@@ -57,27 +59,34 @@ class MusicRNN(nn.Module):
 
 class MusicTransformer(nn.Module):
 
-    def __init__(self, n_states, d_model=512, n_heads=8, n_encoder_layers=6, n_decoder_layers=6,
+    def __init__(self, n_states, d_model=256, n_heads=8, n_encoder_layers=6, n_decoder_layers=6,
             dim_feedforward=2048, dropout=0.1):
 
         super().__init__()
 
         self.encoder = Encoder(EncoderLayer(d_model, n_heads, dim_feedforward,
             dropout), n_encoder_layers)
-
+        
         self.decoder = Decoder(DecoderLayer(d_model, n_heads, dim_feedforward,
             dropout), n_decoder_layers)
+
+        self.src_embed = nn.Sequential(SequenceEmbedding(n_states, d_model), PositionalEncoding(d_model, dropout))
+
+        self.tgt_embed = nn.Sequential(SequenceEmbedding(n_states, d_model), PositionalEncoding(d_model, dropout))
         
         #number of unique states in a musical sequence
         self.n_states = n_states
+
+        self.dense = nn.Linear(d_model, n_states)
     
     def forward(self, src, tgt, src_mask=None, tgt_mask=None):
+        memory = self.encoder(self.src_embed(src), src_mask)
 
-        memory = self.encoder(src, src_mask)
+        output = self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
 
-        output = self.decoder(tgt, memory, src_mask, tgt_mask)
+        projected_output = self.dense(output)
 
-        return output
+        return projected_output
 
 class Encoder(nn.Module):
     "Stack of n encoder layers"
@@ -189,3 +198,39 @@ class PositionwiseFeedForward(nn.Module):
     def forward(self, x):
         return self.w_2(self.dropout(F.relu(self.w_1(x))))
 
+class SequenceEmbedding(nn.Module):
+    """
+    Standard embedding, scaled by the sqrt of model's hidden state size
+    """
+    def __init__(self, vocab_size, model_size):
+        super().__init__()
+        self.d_model = model_size
+        self.emb = nn.Embedding(vocab_size, model_size)
+
+    def forward(self, x):
+        return self.emb(x) * math.sqrt(self.d_model)
+
+class PositionalEncoding(nn.Module):
+    """
+    Fixed sinusoidal positional encodings
+    """
+    def __init__(self, d_model, dropout, max_len=5000):
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+        #
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0.0, max_len).unsqueeze(1)
+        #geometric progression of wavelengths
+        div_term = torch.exp(torch.arange(0.0, d_model, 2) * \
+                - (math.log(10000.0) / d_model))
+        #even positions
+        pe[0:, 0::2] = torch.sin(position * div_term)
+        #odd positions
+        pe[0:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)
+        #save untrained parameter to state_dict
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + torch.Tensor(self.pe[:, :x.size(1)])
+        return self.dropout(x)
