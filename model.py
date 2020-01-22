@@ -5,7 +5,6 @@ from torch.nn.modules.rnn import PackedSequence
 from helpers import clones
 from attention import MultiheadedAttention
 import math
-import pdb
 
 class MusicRNN(nn.Module):
     """
@@ -76,7 +75,7 @@ class MusicTransformer(nn.Module):
         
         #number of unique states in a musical sequence
         self.n_states = n_states
-
+        #project embedded sequence back onto space of sequence states
         self.dense = nn.Linear(d_model, n_states)
     
     def forward(self, src, tgt, src_mask=None, tgt_mask=None):
@@ -163,6 +162,7 @@ class DecoderLayer(nn.Module):
         tgt = tgt + self.dropout1(self_attn)
         tgt = self.norm1(tgt)
         #perform attention over encoder output
+        #query target embeddings, key/values are encoder output
         src_attn = self.src_attn(tgt, memory, memory, src_mask)
         tgt = tgt + self.dropout2(src_attn)
         tgt = self.norm2(tgt)

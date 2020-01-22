@@ -3,35 +3,39 @@ import torch
 import torch.nn as nn
 import time
 from random import shuffle
+import pdb
 
 
-def pad_batch(input_sequences, target_sequences, n_states,
+def make_batch(input_sequences, target_sequences, n_states,
         padded_length = 256):
 
     sequence_lengths = [len(s) for s in input_sequences]
     batch_size = len(input_sequences)
 
     x = torch.zeros(batch_size, padded_length, dtype=torch.long)
-    #right shape??? i don't think so
-    input_mask = torch.tensor(x)
+    #padding element
     y = torch.zeros(batch_size, padded_length, dtype=torch.long)
-    target_mask = torch.tensor(y)
 
     for i, sequence in enumerate(input_sequences):
         seq_length = sequence_lengths[i]
         #copy over input sequence data with zero-padding
         #cast to long to be embedded into model's hidden dimension
         x[i, :seq_length] = torch.Tensor(sequence).unsqueeze(0)
-        ##input mask: 0 for padded entries, else 1
-        #sequence_mask = sequence.sum(1).unsqueeze(1).repeat(1, n_states)
-        #input_mask[i, :seq_length, :] = sequence_mask.unsqueeze(0)
 
+    x_mask = (x != 0)
 
     for i, sequence in enumerate(target_sequences):
         seq_length = sequence_lengths[i]
         y[i, :seq_length] = torch.Tensor(sequence).unsqueeze(0)
 
-    return (x.cuda(), y.cuda()) if torch.cuda.is_available() else (x, y)
+    y_mask = (y != 0)
+    #TODO subsequent mask
+    pdb.set_trace()
+
+    if torch.cuda.is_available():
+        return x.cuda(), y.cuda(), x_mask.cuda(), y_mask.cuda()
+    else:
+        return x, y, x_mask, y_mask
 
 def train(model, training_data, validation_data,
         epochs, evaluate_per, batch_size, padded_length,
@@ -63,9 +67,10 @@ def train(model, training_data, validation_data,
             if len(input_sequences) != batch_size:
                 continue
 
-            x, y = pad_batch(input_sequences, target_sequences, model.n_states, padded_length)
+            x, y, x_mask, y_mask = make_batch(input_sequences, 
+                    target_sequences, model.n_states, padded_length)
             
-            y_hat = model(x, y).transpose(1,2)
+            y_hat = model(x, y, x_mask, y_mask).transpose(1,2)
             #shape: (batch_size, n_states, seq_length)
 
             loss = loss_function(y_hat, y)
@@ -103,7 +108,7 @@ def train(model, training_data, validation_data,
                 if len(input_sequences) != batch_size:
                     continue
 
-                x, y = pad_batch(input_sequences, target_sequences, model.n_states, padded_length)
+                x, y = make_batch(input_sequences, target_sequences, model.n_states, padded_length)
 
                 y_hat = model(x,y).transpose(1,2)
                 loss = loss_function(y_hat, y)

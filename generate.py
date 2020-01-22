@@ -144,7 +144,6 @@ def main():
     keep_ghosts = args.keep_ghosts
     stuck_note_duration = None if args.stuck_note_duration == 0 else args.stuck_note_duration
 
-    #TODO take in a priming sequence
     for temp in temps:
         print(f"sampling temp={temp}")
         note_sequence = []

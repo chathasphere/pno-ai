@@ -18,11 +18,10 @@ def main():
 
     #set up data pipeline
     seq_length = 128
-    padding = 0
-    padded_length = seq_length + padding
+    padded_length = 128
     pipeline = PreprocessingPipeline(input_dir=input_dir, stretch_factors=[0.975, 1, 1.025],
             split_size=30, sampling_rate=sampling_rate, n_velocity_bins=n_velocity_bins,
-            transpositions=range(-2,3), training_val_split=training_val_split, max_encoded_length=seq_length+1, min_encoded_length=129)
+            transpositions=range(-2,3), training_val_split=training_val_split, max_encoded_length=seq_length+1, min_encoded_length=33)
 
     pipeline.run()
     training_sequences = pipeline.encoded_sequences['training']
