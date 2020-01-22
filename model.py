@@ -101,6 +101,7 @@ class Encoder(nn.Module):
         for layer in self.layers:
             x = layer(x, mask)
         #normalize output of encoder
+        print('batch encoded')
         return self.norm(x)
 
 class EncoderLayer(nn.Module):
@@ -138,6 +139,7 @@ class Decoder(nn.Module):
     def forward(self, x, memory, src_mask, tgt_mask):
         for layer in self.layers:
             x = layer(x, memory, src_mask, tgt_mask)
+        print('batch decoded')
         return self.norm(x)
 
 class DecoderLayer(nn.Module):

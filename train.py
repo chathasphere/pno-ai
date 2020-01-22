@@ -1,10 +1,8 @@
-from helpers import prepare_batches, one_hot
+from helpers import prepare_batches, subsequent_mask
 import torch
 import torch.nn as nn
 import time
 from random import shuffle
-import pdb
-
 
 def make_batch(input_sequences, target_sequences, n_states,
         padded_length = 256):
@@ -22,15 +20,15 @@ def make_batch(input_sequences, target_sequences, n_states,
         #cast to long to be embedded into model's hidden dimension
         x[i, :seq_length] = torch.Tensor(sequence).unsqueeze(0)
 
-    x_mask = (x != 0)
+    x_mask = (x != 0).unsqueeze(1)
 
     for i, sequence in enumerate(target_sequences):
         seq_length = sequence_lengths[i]
         y[i, :seq_length] = torch.Tensor(sequence).unsqueeze(0)
 
-    y_mask = (y != 0)
-    #TODO subsequent mask
-    pdb.set_trace()
+    y_mask = (y != 0).unsqueeze(1)
+    sm = subsequent_mask(padded_length)
+    y_mask = (y_mask & sm)
 
     if torch.cuda.is_available():
         return x.cuda(), y.cuda(), x_mask.cuda(), y_mask.cuda()
