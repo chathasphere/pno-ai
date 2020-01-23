@@ -101,7 +101,6 @@ class Encoder(nn.Module):
         for layer in self.layers:
             x = layer(x, mask)
         #normalize output of encoder
-        print('batch encoded')
         return self.norm(x)
 
 class EncoderLayer(nn.Module):
@@ -139,7 +138,6 @@ class Decoder(nn.Module):
     def forward(self, x, memory, src_mask, tgt_mask):
         for layer in self.layers:
             x = layer(x, memory, src_mask, tgt_mask)
-        print('batch decoded')
         return self.norm(x)
 
 class DecoderLayer(nn.Module):
@@ -234,5 +232,5 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        x = x + torch.Tensor(self.pe[:, :x.size(1)])
+        x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)

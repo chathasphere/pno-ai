@@ -67,7 +67,6 @@ def train(model, training_data, validation_data,
 
             x, y, x_mask, y_mask = make_batch(input_sequences, 
                     target_sequences, model.n_states, padded_length)
-            
             y_hat = model(x, y, x_mask, y_mask).transpose(1,2)
             #shape: (batch_size, n_states, seq_length)
 
