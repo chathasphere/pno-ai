@@ -68,8 +68,8 @@ def train(model, training_data, validation_data,
             x, y, x_mask, y_mask = make_batch(input_sequences, 
                     target_sequences, model.n_states, padded_length)
             y_hat = model(x, y, x_mask, y_mask).transpose(1,2)
-            #shape: (batch_size, n_states, seq_length)
 
+            #shape: (batch_size, n_states, seq_length)
             loss = loss_function(y_hat, y)
 
             #detach hidden state from the computation graph; we don't need its gradient
@@ -105,7 +105,9 @@ def train(model, training_data, validation_data,
                 if len(input_sequences) != batch_size:
                     continue
 
-                x, y = make_batch(input_sequences, target_sequences, model.n_states, padded_length)
+                x, y, x_mask, y_mask = make_batch(input_sequences, 
+                        target_sequences, model.n_states, 
+                        padded_length)
 
                 y_hat = model(x,y).transpose(1,2)
                 loss = loss_function(y_hat, y)

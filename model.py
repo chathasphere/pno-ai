@@ -5,6 +5,7 @@ from torch.nn.modules.rnn import PackedSequence
 from helpers import clones
 from attention import MultiheadedAttention
 import math
+import pdb
 
 class MusicRNN(nn.Module):
     """
