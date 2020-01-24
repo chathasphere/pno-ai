@@ -3,10 +3,11 @@ import torch
 import torch.nn as nn
 import time
 from random import shuffle
+import pdb
 
 
 def make_batch(input_sequences, target_sequences, n_states,
-        padded_length = 256):
+        padded_length):
 
     sequence_lengths = [len(s) for s in input_sequences]
     batch_size = len(input_sequences)
@@ -22,19 +23,19 @@ def make_batch(input_sequences, target_sequences, n_states,
         x[i, :seq_length] = torch.Tensor(sequence).unsqueeze(0)
 
     x_mask = (x != 0).unsqueeze(1)
+    sm = subsequent_mask(padded_length)
+    x_mask = (x_mask.type(torch.uint8) & sm)
 
     for i, sequence in enumerate(target_sequences):
         seq_length = sequence_lengths[i]
         y[i, :seq_length] = torch.Tensor(sequence).unsqueeze(0)
 
-    y_mask = (y != 0).unsqueeze(1)
-    sm = subsequent_mask(padded_length)
-    y_mask = (y_mask & sm.type(torch.bool))
+    #y_mask = (y != 0).unsqueeze(1)
 
     if torch.cuda.is_available():
-        return x.cuda(), y.cuda(), x_mask.cuda(), y_mask.cuda()
+        return x.cuda(), y.cuda(), x_mask.cuda()
     else:
-        return x, y, x_mask, y_mask
+        return x, y, x_mask 
 
 def train(model, training_data, validation_data,
         epochs, evaluate_per, batch_size, padded_length,
@@ -44,7 +45,9 @@ def train(model, training_data, validation_data,
 
     model.train()
     optimizer = torch.optim.Adam(model.parameters())
-    loss_function = nn.CrossEntropyLoss(ignore_index=0)
+    #loss_function = nn.CrossEntropyLoss(ignore_index=0)
+
+    loss_function = nn.CrossEntropyLoss()
 
     if torch.cuda.is_available():
         model.cuda()
@@ -65,9 +68,9 @@ def train(model, training_data, validation_data,
             #skip batches that are undersized
             if len(input_sequences) != batch_size:
                 continue
-            x, y, x_mask, y_mask = make_batch(input_sequences, 
+            x, y, x_mask = make_batch(input_sequences, 
                     target_sequences, model.n_states, padded_length)
-            y_hat = model(x, y, x_mask, y_mask).transpose(1,2)
+            y_hat = model(x, x_mask).transpose(1,2)
 
             #shape: (batch_size, n_states, seq_length)
 
@@ -106,11 +109,11 @@ def train(model, training_data, validation_data,
                 if len(input_sequences) != batch_size:
                     continue
 
-                x, y, x_mask, y_mask = make_batch(input_sequences, 
+                x, y, x_mask = make_batch(input_sequences, 
                         target_sequences, model.n_states, 
                         padded_length)
 
-                y_hat = model(x,y).transpose(1,2)
+                y_hat = model(x, x_mask).transpose(1,2)
                 loss = loss_function(y_hat, y)
                 val_loss += loss.item()
                 n_batches += 1

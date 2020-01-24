@@ -3,7 +3,6 @@ sys.path.append("..")
 from preprocess import PreprocessingPipeline
 from train import train
 from model import MusicTransformer
-from generate import sample
 
 def main():
 
