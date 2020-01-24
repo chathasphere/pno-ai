@@ -28,7 +28,7 @@ def make_batch(input_sequences, target_sequences, n_states,
 
     y_mask = (y != 0).unsqueeze(1)
     sm = subsequent_mask(padded_length)
-    y_mask = (y_mask & sm)
+    y_mask = (y_mask & sm.type(torch.bool))
 
     if torch.cuda.is_available():
         return x.cuda(), y.cuda(), x_mask.cuda(), y_mask.cuda()
