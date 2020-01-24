@@ -29,7 +29,8 @@ def main():
     n_states = 256 + sampling_rate + n_velocity_bins
     batch_size = 20
     optim="adam"
-    transformer = MusicTransformer(n_states)
+    transformer = MusicTransformer(n_states,
+            d_model=4, dim_feedforward=32, n_heads=4)
     train(transformer, training_sequences, validation_sequences, epochs = 2, padded_length=padded_length,
             evaluate_per=1, batch_size=batch_size, batches_per_print=1)
 

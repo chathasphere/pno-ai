@@ -4,6 +4,7 @@ import torch.nn as nn
 import time
 from random import shuffle
 
+
 def make_batch(input_sequences, target_sequences, n_states,
         padded_length = 256):
 
@@ -43,7 +44,7 @@ def train(model, training_data, validation_data,
 
     model.train()
     optimizer = torch.optim.Adam(model.parameters())
-    loss_function = nn.CrossEntropyLoss()
+    loss_function = nn.CrossEntropyLoss(ignore_index=0)
 
     if torch.cuda.is_available():
         model.cuda()
@@ -64,12 +65,12 @@ def train(model, training_data, validation_data,
             #skip batches that are undersized
             if len(input_sequences) != batch_size:
                 continue
-
             x, y, x_mask, y_mask = make_batch(input_sequences, 
                     target_sequences, model.n_states, padded_length)
             y_hat = model(x, y, x_mask, y_mask).transpose(1,2)
 
             #shape: (batch_size, n_states, seq_length)
+
             loss = loss_function(y_hat, y)
 
             #detach hidden state from the computation graph; we don't need its gradient

@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import pdb
 import math
 from helpers import clones
 import torch.nn.functional as F
@@ -15,7 +14,7 @@ def attention(query, key, value, mask=None, dropout=None):
     #matmul always multiplies across last two dimensions
     scores = torch.matmul(query, key.transpose(-2,-1)) / math.sqrt(d_k)
     #scores has dim (batch_size, n_heads, seq_length, seq_length)
-
+    #interpretation as logits
     if mask is not None:
         #mask out "illegal" connections with large negative values
         scores = scores.masked_fill(mask == 0, -1e9)

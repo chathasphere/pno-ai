@@ -163,7 +163,8 @@ class DecoderLayer(nn.Module):
         tgt = tgt + self.dropout1(self_attn)
         tgt = self.norm1(tgt)
         #perform attention over encoder output
-        #query target embeddings, key/values are encoder output
+        #query is output from masked self attention
+        #key/values are output from from encoder
         src_attn = self.src_attn(tgt, memory, memory, src_mask)
         tgt = tgt + self.dropout2(src_attn)
         tgt = self.norm2(tgt)
