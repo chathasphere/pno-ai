@@ -3,6 +3,7 @@ sys.path.append("..")
 from preprocess import PreprocessingPipeline
 from train import train
 from model import MusicTransformer
+from generate import sample
 
 def main():
 
@@ -26,12 +27,13 @@ def main():
     training_sequences = pipeline.encoded_sequences['training']
     validation_sequences = pipeline.encoded_sequences['validation']
     n_states = 256 + sampling_rate + n_velocity_bins
-    batch_size = 20
+    batch_size = 10
     optim="adam"
     transformer = MusicTransformer(n_states,
             d_model=4, dim_feedforward=32, n_heads=4)
-    train(transformer, training_sequences, validation_sequences, epochs = 2, padded_length=padded_length,
-            evaluate_per=1, batch_size=batch_size, batches_per_print=1)
+    train(transformer, training_sequences, validation_sequences, epochs = 1, padded_length=padded_length,
+            evaluate_per=5, batch_size=batch_size, batches_per_print=1)
+    print(sample(transformer, 10))
 
 
 if __name__== "__main__":

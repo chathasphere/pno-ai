@@ -1,5 +1,5 @@
 import argparse, pathlib, uuid, subprocess
-import model
+from model import MusicTransformer
 from sequence_encoder import SequenceEncoder
 import torch
 import torch.nn.functional as F
@@ -7,6 +7,7 @@ import numpy as np
 from helpers import one_hot
 from pretty_midi import PrettyMIDI, Instrument
 import midi_input
+import pdb
 
 class GeneratorError(Exception):
     pass
@@ -33,27 +34,23 @@ def sample(model, sample_length, prime_sequence=[], temperature=1,
     """
     #deactivate training mode
     model.eval()
-    #initialize output
-    output_sequence = prime_sequence
     if len(prime_sequence) == 0:
         #if no prime is provided, randomly select a starting event
         input_sequence = [np.random.randint(model.n_states)]
     else:
         input_sequence = prime_sequence
-    #initialize hidden state
-    hx = None
-    for i in range(sample_length):
-        input_tensor = one_hot(input_sequence, model.n_states)
-        #add singleton dimension for the batch (in the middle)
-        input_tensor = input_tensor.unsqueeze(1)
-        #verify batching works
-        out, hx = model(input_tensor, hx, pack_batches=True)
-        hx = tuple(h.detach() for h in hx)
 
-        #out = out.squeeze()
+    for i in range(sample_length):
+        if torch.cuda.is_available():
+            input_tensor = torch.LongTensor(input_sequence).cuda()
+        else:
+            input_tensor = torch.LongTensor(input_sequence)
+        #add singleton dimension for the batch 
+        input_tensor = input_tensor.unsqueeze(0)
+        out = model(input_tensor)
         probs = F.softmax(out / temperature, dim=-1)
         #keep the probability distribution for the *next* state only
-        probs = probs[-1,:]
+        probs = probs[:, -1, :]
 
         if topk is not None:
             #sample from only the top k most probable states
@@ -66,31 +63,19 @@ def sample(model, sample_length, prime_sequence=[], temperature=1,
 
         next_char_ix = torch.multinomial(probs,1).item()
 
-        input_sequence = [next_char_ix]
-        output_sequence.append(next_char_ix)
+        input_sequence.append(next_char_ix)
 
-    return output_sequence
-
-
-#SAVE INFORMATION ON MODELS HERE
-#should this be a yaml? perhaps.
-MODEL_DICT = {
-        'rnn': {'path': "saved_models/rnn_20190916", 
-            'model': model.MusicRNN, 
-            'args': {'n_states': 413, 'hidden_size': 512, 'n_rnn_layers': 3},
-            'n_velocity_events': 32,
-            'n_time_shift_events': 125}
-        }
-
+    return input_sequence
 
 def main():
     parser = argparse.ArgumentParser("Script to generate MIDI tracks by sampling from a trained model.")
 
-    parser.add_argument("--model_key", type=str, 
-            help="key to MODEL_DICT, allowing access to the path of a saved model & its params")
+#    parser.add_argument("--model_key", type=str, 
+#            help="key to MODEL_DICT, allowing access to the path of a saved model & its params")
     parser.add_argument("--sample_length", type=int, default=512,
             help="number of events to generate")
-    parser.add_argument("--temps", nargs="+", type=float, default=1.0,
+    parser.add_argument("--temps", nargs="+", type=float, 
+            default=[1.0],
             help="space-separated list of temperatures to use when sampling")
     parser.add_argument("--topks", nargs="+", type=int,
             help="space-separated list of topks to use when sampling")
@@ -106,17 +91,20 @@ def main():
 
     args=parser.parse_args()
 
-    model_key = args.model_key
-    if MODEL_DICT.get(model_key) is None:
-        raise GeneratorError("model key not supplied or not recognized!")
-
+#    model_key = args.model_key
+#    if MODEL_DICT.get(model_key) is None:
+#        raise GeneratorError("model key not supplied or not recognized!")
+    model_path = "saved_models/tf_20200124"
+    model_key = "tf_20200124"
+    model_args = {"n_states": 413, "d_model": 64,
+            "dim_feedforward": 512, "n_heads": 4, "n_layers": 3}
     try:
-        state = torch.load(MODEL_DICT[model_key]['path'])
+        state = torch.load(model_path)
     except RuntimeError:
-        state = torch.load(MODEL_DICT[model_key]['path'], map_location="cpu")
+        state = torch.load(model_path, map_location="cpu")
     
-    n_velocity_events = MODEL_DICT[model_key]['n_velocity_events']
-    n_time_shift_events = MODEL_DICT[model_key]['n_time_shift_events']
+    n_velocity_events = 32
+    n_time_shift_events = 125
 
     decoder = SequenceEncoder(n_time_shift_events, n_velocity_events)
 
@@ -128,8 +116,7 @@ def main():
     else:
         prime_sequence = []
 
-    model_args = MODEL_DICT[model_key]['args']
-    model = MODEL_DICT[model_key]['model'](**model_args)
+    model = MusicTransformer(**model_args)
     model.load_state_dict(state)
 
     temps = args.temps
@@ -148,20 +135,15 @@ def main():
         print(f"sampling temp={temp}")
         note_sequence = []
         for i in range(n_trials):
+            print("generating sequence")
             output_sequence = sample(model, prime_sequence = prime_sequence,
                     sample_length=args.sample_length, temperature=temp)
             note_sequence = decoder.decode_sequence(output_sequence, 
-                verbose=True, stuck_note_duration=3)
+                verbose=True, stuck_note_duration=None)
 
-
-        #note_sequence2 = decoder.decode_sequence(output_sequence, stuck_note_duration=10)
-
-        #note_sequence3 = decoder.decode_sequence(output_sequence, keep_ghosts=True)
             output_dir = f"output/{model_key}/{trial_key}/"
             file_name = f"sample{i+1}_{temp}"
             write_midi(note_sequence, output_dir, file_name)
-        #write_midi(note_sequence, output_dir, "sticky_notes")
-        #write_midi(note_sequence, output_dir, "ghost_notes")
 
     for temp in temps:      
         try:
