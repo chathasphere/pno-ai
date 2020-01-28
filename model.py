@@ -2,59 +2,58 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.rnn import PackedSequence
-from helpers import clones
+from helpers import clones, d
 from attention import MultiheadedAttention
 import math
-import pdb
 
 class MusicTransformer(nn.Module):
+    """Generative, autoregressive transformer model. Train on a 
+    dataset of encoded musical sequences."""
 
-    def __init__(self, n_states, d_model=64, n_heads=4, n_layers=2, dim_feedforward=512, dropout=0.1):
-
+    def __init__(self, n_tokens, d_model=64, n_heads=4, depth=2, d_feedforward=512, dropout=0.1):
+        """
+        Args:
+            n_tokens: number of commands/states in encoded musical sequence
+            d_model: dimensionality of embedded sequences
+            n_heads: number of attention heads
+            depth: number of stacked transformer layers
+            d_feedforward: dimensionality of dense sublayer 
+            dropout: probability of dropout in dropout sublayer
+        """
         super().__init__()
-
-        self.decoder = Decoder(DecoderLayer(d_model, n_heads, dim_feedforward, dropout), n_layers)
-
-        self.embed = nn.Sequential(SequenceEmbedding(n_states, d_model), PositionalEncoding(d_model, dropout))
-
-        #number of unique states in a musical sequence
-        self.n_states = n_states
-        #project embedded sequence back onto space of sequence states
-        #interpret output as logits
-        self.to_scores = nn.Linear(d_model, n_states)
+        #number of commands in an encoded musical sequence
+        self.n_tokens = n_tokens
+        #embedding layer
+        self.embed = SequenceEmbedding(n_tokens, d_model)
+        #positional encoding layer
+        self.pos = PositionalEncoding(d_model, dropout)
+        #last layer, outputs logits of next token in sequence
+        self.to_scores = nn.Linear(d_model, n_tokens)
+        self.layers = clones(DecoderLayer(d_model, n_heads,
+            d_feedforward, dropout), depth)
+        self.norm = nn.LayerNorm(d_model)
     
     def forward(self, x, mask=None):
-
-        z = self.decoder(self.embed(x), mask)
-
-        return self.to_scores(z)
-
-class Decoder(nn.Module):
-    "Stack of n decoder layers"
-    def __init__(self, layer, n_layers):
-
-        super().__init__()
-        self.layers = clones(layer, n_layers)
-        self.norm = LayerNorm(layer.size)
-
-
-    def forward(self, x, mask):
-        "Pass input and mask through each layer"
+        x = self.embed(x)
+        x = self.pos(x)
+        #pass input batch and mask through layers
         for layer in self.layers:
-            x = layer(x, mask)
-        #normalize output of decoder
-        return self.norm(x)
+            x  = layer(x, mask)
+        #one last normalization for good measure
+        z = self.norm(x)
+        return self.to_scores(z)
 
 class DecoderLayer(nn.Module):
 
-    def __init__(self, size, n_heads, dim_feedforward, dropout):
+    def __init__(self, size, n_heads, d_feedforward, dropout):
 
         super().__init__()
         self.self_attn = MultiheadedAttention(n_heads, size)
-        self.feed_forward = PositionwiseFeedForward(size, dim_feedforward, dropout)
+        self.feed_forward = PositionwiseFeedForward(size, d_feedforward, dropout)
         self.size = size
-        self.norm1 = LayerNorm(size)
-        self.norm2 = LayerNorm(size)
+        #normalize over mean/std of embedding dimension
+        self.norm1 = nn.LayerNorm(size)
+        self.norm2 = nn.LayerNorm(size)
         self.dropout1 = nn.Dropout(dropout)
         self.dropout2 = nn.Dropout(dropout)
 
@@ -62,6 +61,8 @@ class DecoderLayer(nn.Module):
     def forward(self, x, mask):
         #perform masked attention on input
         #masked so queries cannot attend to subsequent keys
+        #Pass through sublayers of attention and feedforward.
+        #Apply dropout to sublayer output, add it to input, and norm.
         attn = self.self_attn(x, x, x, mask)
         x = x + self.dropout1(attn)
         x = self.norm1(x)
@@ -71,21 +72,6 @@ class DecoderLayer(nn.Module):
         x = self.norm2(x)
 
         return x
-
-
-class LayerNorm(nn.Module):
-    def __init__(self, n_features, eps=1e-6):
-
-        super().__init__()
-        self.gamma = nn.Parameter(torch.ones(n_features))
-        self.beta = nn.Parameter(torch.zeros(n_features))
-        self.eps = eps
-
-    def forward(self, x):
-        #implies batch is the last dimension?
-        mean = x.mean(-1, keepdim=True)
-        std = x.std(-1, keepdim=True)
-        return self.gamma * (x - mean) / (std + self.eps) + self.beta
 
 class PositionwiseFeedForward(nn.Module):
 
@@ -112,14 +98,15 @@ class SequenceEmbedding(nn.Module):
 
 class PositionalEncoding(nn.Module):
     """
-    Fixed sinusoidal positional encodings
+    Fixed sinusoidal positional encodings. This contains information
+    on the relative position of tokens. Each position is a sinusoidal wave, and each offset can be expressed as a linear function of another position.  
     """
     def __init__(self, d_model, dropout, max_len=5000):
+
         super().__init__()
         self.dropout = nn.Dropout(dropout)
-        #
         pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0.0, max_len).unsqueeze(1)
+        position = torch.arange(max_len, device=d()).unsqueeze(1)
         #geometric progression of wavelengths
         div_term = torch.exp(torch.arange(0.0, d_model, 2) * \
                 - (math.log(10000.0) / d_model))

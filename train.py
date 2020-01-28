@@ -3,10 +3,9 @@ import torch
 import torch.nn as nn
 import time
 from random import shuffle
-import pdb
 
 
-def make_batch(input_sequences, target_sequences, n_states,
+def make_batch(input_sequences, target_sequences, n_tokens,
         padded_length):
 
     sequence_lengths = [len(s) for s in input_sequences]
@@ -29,8 +28,6 @@ def make_batch(input_sequences, target_sequences, n_states,
     for i, sequence in enumerate(target_sequences):
         seq_length = sequence_lengths[i]
         y[i, :seq_length] = torch.Tensor(sequence).unsqueeze(0)
-
-    #y_mask = (y != 0).unsqueeze(1)
 
     if torch.cuda.is_available():
         return x.cuda(), y.cuda(), x_mask.cuda()
@@ -69,10 +66,10 @@ def train(model, training_data, validation_data,
             if len(input_sequences) != batch_size:
                 continue
             x, y, x_mask = make_batch(input_sequences, 
-                    target_sequences, model.n_states, padded_length)
+                    target_sequences, model.n_tokens, padded_length)
             y_hat = model(x, x_mask).transpose(1,2)
 
-            #shape: (batch_size, n_states, seq_length)
+            #shape: (batch_size, n_tokens, seq_length)
 
             loss = loss_function(y_hat, y)
 
@@ -110,7 +107,7 @@ def train(model, training_data, validation_data,
                     continue
 
                 x, y, x_mask = make_batch(input_sequences, 
-                        target_sequences, model.n_states, 
+                        target_sequences, model.n_tokens, 
                         padded_length)
 
                 y_hat = model(x, x_mask).transpose(1,2)
