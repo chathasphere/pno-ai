@@ -26,11 +26,11 @@ def main():
     pipeline.run()
     training_sequences = pipeline.encoded_sequences['training']
     validation_sequences = pipeline.encoded_sequences['validation']
-    n_states = 256 + sampling_rate + n_velocity_bins
+    n_tokens = 256 + sampling_rate + n_velocity_bins
     batch_size = 10
     optim="adam"
-    transformer = MusicTransformer(n_states,
-            d_model=4, dim_feedforward=32, n_heads=4)
+    transformer = MusicTransformer(n_tokens, d_model=4,
+            d_feedforward=32, n_heads=4)
     train(transformer, training_sequences, validation_sequences, epochs = 1, padded_length=padded_length,
             evaluate_per=5, batch_size=batch_size, batches_per_print=1)
     print(sample(transformer, 10))
