@@ -4,7 +4,6 @@ import torch.nn as nn
 import time
 from random import shuffle
 
-
 def make_batch(input_sequences, target_sequences, n_tokens,
         padded_length):
 
@@ -34,6 +33,7 @@ def make_batch(input_sequences, target_sequences, n_tokens,
     else:
         return x, y, x_mask 
 
+#TODO padded length is kinda awkwardly named
 def train(model, training_data, validation_data,
         epochs, evaluate_per, batch_size, padded_length,
         batches_per_print=100):

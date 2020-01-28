@@ -9,10 +9,12 @@ class MusicTransformer(nn.Module):
     """Generative, autoregressive transformer model. Train on a 
     dataset of encoded musical sequences."""
 
-    def __init__(self, n_tokens, d_model=64, n_heads=4, depth=2, d_feedforward=512, dropout=0.1):
+    def __init__(self, n_tokens, seq_length, d_model=64, 
+            n_heads=4, depth=2, d_feedforward=512, dropout=0.1):
         """
         Args:
             n_tokens: number of commands/states in encoded musical sequence
+            seq_length: length of (padded) input/target sequences
             d_model: dimensionality of embedded sequences
             n_heads: number of attention heads
             depth: number of stacked transformer layers
@@ -25,7 +27,7 @@ class MusicTransformer(nn.Module):
         #embedding layer
         self.embed = SequenceEmbedding(n_tokens, d_model)
         #positional encoding layer
-        self.pos = PositionalEncoding(d_model, dropout)
+        self.pos = nn.Embedding(seq_length, d_model)
         #last layer, outputs logits of next token in sequence
         self.to_scores = nn.Linear(d_model, n_tokens)
         self.layers = clones(DecoderLayer(d_model, n_heads,
@@ -34,7 +36,10 @@ class MusicTransformer(nn.Module):
     
     def forward(self, x, mask=None):
         x = self.embed(x)
-        x = self.pos(x)
+        b,t,e = x.size()
+        positions = self.pos(torch.arange(t, 
+            device=d()))[None, :, :].expand(b, t, e)
+        x = x + positions
         #pass input batch and mask through layers
         for layer in self.layers:
             x  = layer(x, mask)
@@ -47,7 +52,7 @@ class DecoderLayer(nn.Module):
     def __init__(self, size, n_heads, d_feedforward, dropout):
 
         super().__init__()
-        self.self_attn = MultiheadedAttention(n_heads, size)
+        self.self_attn = MultiheadedAttention(size, n_heads, dropout)
         self.feed_forward = PositionwiseFeedForward(size, d_feedforward, dropout)
         self.size = size
         #normalize over mean/std of embedding dimension
@@ -62,7 +67,7 @@ class DecoderLayer(nn.Module):
         #masked so queries cannot attend to subsequent keys
         #Pass through sublayers of attention and feedforward.
         #Apply dropout to sublayer output, add it to input, and norm.
-        attn = self.self_attn(x, x, x, mask)
+        attn = self.self_attn(x, mask)
         x = x + self.dropout1(attn)
         x = self.norm1(x)
 
@@ -94,29 +99,3 @@ class SequenceEmbedding(nn.Module):
 
     def forward(self, x):
         return self.emb(x) * math.sqrt(self.d_model)
-
-class PositionalEncoding(nn.Module):
-    """
-    Fixed sinusoidal positional encodings. This contains information
-    on the relative position of tokens. Each position is a sinusoidal wave, and each offset can be expressed as a linear function of another position.  
-    """
-    def __init__(self, d_model, dropout, max_len=5000):
-
-        super().__init__()
-        self.dropout = nn.Dropout(dropout)
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(max_len).unsqueeze(1)
-        #geometric progression of wavelengths
-        div_term = torch.exp(torch.arange(0.0, d_model, 2) * \
-                - (math.log(10000.0) / d_model))
-        #even positions
-        pe[0:, 0::2] = torch.sin(position * div_term)
-        #odd positions
-        pe[0:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0)
-        #save untrained parameter to state_dict
-        self.register_buffer('pe', pe)
-
-    def forward(self, x):
-        x = x + self.pe[:, :x.size(1)]
-        return self.dropout(x)
