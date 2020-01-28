@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.modules.rnn import PackedSequence
 from helpers import clones, d
 from attention import MultiheadedAttention
 import math
@@ -106,7 +105,7 @@ class PositionalEncoding(nn.Module):
         super().__init__()
         self.dropout = nn.Dropout(dropout)
         pe = torch.zeros(max_len, d_model)
-        position = torch.arange(max_len, device=d()).unsqueeze(1)
+        position = torch.arange(max_len).unsqueeze(1)
         #geometric progression of wavelengths
         div_term = torch.exp(torch.arange(0.0, d_model, 2) * \
                 - (math.log(10000.0) / d_model))
