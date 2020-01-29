@@ -44,8 +44,16 @@ class MultiheadedAttention(nn.Module):
 
         # mask out the upper half of the dot matrix, excluding the diagonal
         scores = torch.bmm(queries, keys.transpose(1, 2))
-        subsequent_mask = torch.triu(torch.ones(1, t, t, device=d()), 0)
-        scores = scores.masked_fill(subsequent_mask.transpose(1,2) == 0, -1e9)
+
+        #subsequent_mask = torch.triu(torch.ones(1, t, t, device=d()), 0)
+        subsequent_mask = torch.triu(torch.ones(1, t, t, device=d()),
+                1)
+        scores = scores.masked_fill(subsequent_mask == 1, -1e9)
+        if mask is not None:
+            mask = mask.repeat_interleave(h, 0)
+            wtf = (mask == 0).nonzero().transpose(0,1)
+            scores[wtf[0], wtf[1], :] = -1e9
+
         
         #Convert scores to probabilities
         attn_probs = F.softmax(scores, dim=2)

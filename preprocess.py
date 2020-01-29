@@ -85,16 +85,16 @@ class PreprocessingPipeline():
         self.note_sequences = self.partition(note_sequences)
         for mode, sequences in self.note_sequences.items():
             print(f"Processing {mode} data...")
-            print(f"{len(sequences)} note sequences")
+            print(f"{len(sequences):,} note sequences")
             if mode == "training":
                 sequences = self.stretch_note_sequences(sequences)
-                print(f"{len(sequences)} stretched note sequences")
+                print(f"{len(sequences):,} stretched note sequences")
             samples = self.split_sequences(sequences)
             self.quantize(samples)
-            print(f"{len(samples)} quantized, split samples")
+            print(f"{len(samples):,} quantized, split samples")
             if mode == "training":
                 samples = self.transpose_samples(samples)
-                print(f"{len(samples)} transposed samples")
+                print(f"{len(samples):,} transposed samples")
             self.split_samples[mode] = samples
             self.encoded_sequences[mode] = self.encoder.encode_sequences(samples)
             print(f"Encoded {mode} sequences!\n")

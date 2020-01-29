@@ -1,4 +1,4 @@
-from helpers import prepare_batches, subsequent_mask
+from helpers import prepare_batches
 import torch
 import torch.nn as nn
 import time
@@ -19,10 +19,9 @@ def make_batch(input_sequences, target_sequences, n_tokens,
         #copy over input sequence data with zero-padding
         #cast to long to be embedded into model's hidden dimension
         x[i, :seq_length] = torch.Tensor(sequence).unsqueeze(0)
-
-    x_mask = (x != 0).unsqueeze(1)
-    sm = subsequent_mask(padded_length)
-    x_mask = (x_mask.type(torch.uint8) & sm)
+    
+    x_mask = (x != 0)
+    x_mask = x_mask.type(torch.uint8)
 
     for i, sequence in enumerate(target_sequences):
         seq_length = sequence_lengths[i]
