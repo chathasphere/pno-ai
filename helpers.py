@@ -66,10 +66,3 @@ def d(tensor=None):
     if tensor is None:
         return 'cuda' if torch.cuda.is_available() else 'cpu'
     return 'cuda' if tensor.is_cuda else 'cpu'
-
-def subsequent_mask(size):
-    attn_shape = (1, size, size)
-    subsequent_mask = np.tril(np.ones(attn_shape), k=0)\
-            .astype('uint8')
-    return torch.from_numpy(subsequent_mask)
-
