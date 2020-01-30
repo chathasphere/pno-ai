@@ -36,7 +36,7 @@ def sample(model, sample_length, prime_sequence=[], temperature=1,
     model.eval()
     if len(prime_sequence) == 0:
         #if no prime is provided, randomly select a starting event
-        input_sequence = [np.random.randint(model.n_states)]
+        input_sequence = [np.random.randint(model.n_tokens)]
     else:
         input_sequence = prime_sequence
 
@@ -56,9 +56,9 @@ def sample(model, sample_length, prime_sequence=[], temperature=1,
             #sample from only the top k most probable states
             values, indices = probs.topk(topk)
             if torch.cuda.is_available():
-                zeros = torch.zeros(model.n_states).cuda()
+                zeros = torch.zeros(model.n_tokens).cuda()
             else:
-                zeros = torch.zeros(model.n_states)
+                zeros = torch.zeros(model.n_tokens)
             probs = torch.scatter(zeros, 0, indices, values)
 
         next_char_ix = torch.multinomial(probs,1).item()

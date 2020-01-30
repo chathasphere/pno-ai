@@ -5,11 +5,14 @@ from helpers import clones, d
 from attention import MultiheadedAttention
 import math
 
+class MusicTransformerError(Exception):
+    pass
+
 class MusicTransformer(nn.Module):
     """Generative, autoregressive transformer model. Train on a 
     dataset of encoded musical sequences."""
 
-    def __init__(self, n_tokens, seq_length, d_model=64, 
+    def __init__(self, n_tokens, seq_length=None, d_model=64,
             n_heads=4, depth=2, d_feedforward=512, dropout=0.1,
             positional_encoding=False):
         """
@@ -45,8 +48,8 @@ class MusicTransformer(nn.Module):
             pos = pos.to(d())
             self.register_buffer('pos', pos)
         else:
-            #how to handle sequence length? not needed for
-            #positional encoding
+            if seq_length == None:
+                raise MusicTransformerError("seq_length not provided for positional embeddings")
             self.pos = nn.Embedding(seq_length, d_model)
         #last layer, outputs logits of next token in sequence
         self.to_scores = nn.Linear(d_model, n_tokens)

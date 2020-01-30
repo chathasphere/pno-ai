@@ -4,15 +4,17 @@ import torch.nn as nn
 import time
 from random import shuffle
 
-def make_batch(input_sequences, target_sequences, n_tokens,
-        padded_length):
-
+def batch_to_tensors(batch, n_tokens, max_length):
+    """
+    Make input, input mask, and target tensors for a batch of seqa batch of sequences.
+    """
+    input_sequences, target_sequences = batch
     sequence_lengths = [len(s) for s in input_sequences]
     batch_size = len(input_sequences)
 
-    x = torch.zeros(batch_size, padded_length, dtype=torch.long)
+    x = torch.zeros(batch_size, max_length, dtype=torch.long)
     #padding element
-    y = torch.zeros(batch_size, padded_length, dtype=torch.long)
+    y = torch.zeros(batch_size, max_length, dtype=torch.long)
 
     for i, sequence in enumerate(input_sequences):
         seq_length = sequence_lengths[i]
@@ -32,10 +34,8 @@ def make_batch(input_sequences, target_sequences, n_tokens,
     else:
         return x, y, x_mask 
 
-#TODO padded length is kinda awkwardly named
 def train(model, training_data, validation_data,
-        epochs, evaluate_per, batch_size, padded_length,
-        batches_per_print=100):
+        epochs, batch_size, batches_per_print=100, evaluate_per=1):
 
     training_start_time = time.time()
 
@@ -51,21 +51,24 @@ def train(model, training_data, validation_data,
     else:
         print("GPU not available, CPU used")
 
-    #start a list of mini-batch training losses
     training_losses = []
+    validation_losses = []
+    #pad to length of longest sequence
+    #minus one because input/target sequences are shifted by one char
+    max_length = max((len(L) 
+        for L in (training_data + validation_data))) - 1
     for e in range(epochs):
         batch_start_time = time.time()
         batch_num = 1
         averaged_loss = 0
         training_batches = prepare_batches(training_data, batch_size) #returning batches of a given size
-
-        for input_sequences, target_sequences in training_batches:
+        for batch in training_batches:
 
             #skip batches that are undersized
-            if len(input_sequences) != batch_size:
+            if len(batch[0]) != batch_size:
                 continue
-            x, y, x_mask = make_batch(input_sequences, 
-                    target_sequences, model.n_tokens, padded_length)
+            x, y, x_mask = batch_to_tensors(batch, model.n_tokens, 
+                    max_length)
             y_hat = model(x, x_mask).transpose(1,2)
 
             #shape: (batch_size, n_tokens, seq_length)
@@ -100,14 +103,13 @@ def train(model, training_data, validation_data,
             #get loss per batch
             val_loss = 0
             n_batches = 0
-            for input_sequences, target_sequences in validation_batches:
+            for batch in validation_batches:
 
-                if len(input_sequences) != batch_size:
+                if len(batch[0]) != batch_size:
                     continue
 
-                x, y, x_mask = make_batch(input_sequences, 
-                        target_sequences, model.n_tokens, 
-                        padded_length)
+                x, y, x_mask = batch_to_tensors(batch, model.n_tokens, 
+                        max_length)
 
                 y_hat = model(x, x_mask).transpose(1,2)
                 loss = loss_function(y_hat, y)
@@ -115,7 +117,10 @@ def train(model, training_data, validation_data,
                 n_batches += 1
 
             model.train()
-            print(f"validation loss: {val_loss / n_batches:.2f}")
+            #average out validation loss
+            val_loss = (val_loss / n_batches)
+            validation_losses.append(val_loss)
+            print(f"validation loss: {val_loss:.2f}")
             shuffle(validation_data)
 
     return training_losses

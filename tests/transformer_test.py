@@ -29,10 +29,11 @@ def main():
     n_tokens = 256 + sampling_rate + n_velocity_bins
     batch_size = 10
     optim="adam"
-    transformer = MusicTransformer(n_tokens, padded_length, d_model=4,
-            d_feedforward=32, n_heads=4, positional_encoding=True)
-    train(transformer, training_sequences, validation_sequences, epochs = 1, padded_length=padded_length,
-            evaluate_per=5, batch_size=batch_size, batches_per_print=1)
+    transformer = MusicTransformer(n_tokens, seq_length=padded_length, d_model=4,
+            d_feedforward=32, n_heads=4, positional_encoding=False)
+
+    train(transformer, training_sequences, validation_sequences, epochs = 1, evaluate_per=5, batch_size=batch_size, batches_per_print=1)
+
     print(sample(transformer, 10))
 
 
