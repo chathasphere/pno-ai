@@ -10,7 +10,8 @@ class MusicTransformer(nn.Module):
     dataset of encoded musical sequences."""
 
     def __init__(self, n_tokens, seq_length, d_model=64, 
-            n_heads=4, depth=2, d_feedforward=512, dropout=0.1):
+            n_heads=4, depth=2, d_feedforward=512, dropout=0.1,
+            positional_encoding=False):
         """
         Args:
             n_tokens: number of commands/states in encoded musical sequence
@@ -27,7 +28,26 @@ class MusicTransformer(nn.Module):
         #embedding layer
         self.embed = SequenceEmbedding(n_tokens, d_model)
         #positional encoding layer
-        self.pos = nn.Embedding(seq_length, d_model)
+        self.positional_encoding = positional_encoding
+        if self.positional_encoding:
+            pos = torch.zeros(5000, d_model)
+            position = torch.arange(5000).unsqueeze(1)
+            #geometric progression of wave lengths
+            div_term = torch.exp(torch.arange(0.0, d_model, 2) * \
+                            - (math.log(10000.0) / d_model))
+	    #even positions
+            pos[0:, 0::2] = torch.sin(position * div_term)
+            #odd positions
+            pos[0:, 1::2] = torch.cos(position * div_term)
+            #batch dimension
+            pos = pos.unsqueeze(0)
+            #move to GPU if needed
+            pos = pos.to(d())
+            self.register_buffer('pos', pos)
+        else:
+            #how to handle sequence length? not needed for
+            #positional encoding
+            self.pos = nn.Embedding(seq_length, d_model)
         #last layer, outputs logits of next token in sequence
         self.to_scores = nn.Linear(d_model, n_tokens)
         self.layers = clones(DecoderLayer(d_model, n_heads,
@@ -37,9 +57,13 @@ class MusicTransformer(nn.Module):
     def forward(self, x, mask=None):
         x = self.embed(x)
         b,t,e = x.size()
-        positions = self.pos(torch.arange(t, 
-            device=d()))[None, :, :].expand(b, t, e)
+        if self.positional_encoding:
+            positions = self.pos[:, :t, :]
+        else:
+            positions = self.pos(torch.arange(t, 
+                device=d()))[None, :, :].expand(b, t, e)
         x = x + positions
+        #another dropout layer here?
         #pass input batch and mask through layers
         for layer in self.layers:
             x  = layer(x, mask)
