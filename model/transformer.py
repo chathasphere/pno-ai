@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from helpers import clones, d
-from attention import MultiheadedAttention
+from .attention import MultiheadedAttention
 import math
 
 class MusicTransformerError(Exception):

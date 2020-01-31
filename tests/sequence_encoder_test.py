@@ -1,7 +1,7 @@
 from pretty_midi import Note
 import sys, pdb
 sys.path.append("..")
-from sequence_encoder import SequenceEncoder
+from preprocess import SequenceEncoder
 from helpers import vectorize
 
 sample_note_sequence0 = [

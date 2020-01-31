@@ -2,7 +2,7 @@ import os, random, copy
 import pretty_midi
 from pretty_midi import ControlChange
 import six
-from sequence_encoder import SequenceEncoder
+from .sequence_encoder import SequenceEncoder
 import numpy as np
 from helpers import vectorize
 

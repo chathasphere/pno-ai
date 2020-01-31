@@ -1,6 +1,6 @@
 import argparse, pathlib, uuid, subprocess
 from model import MusicTransformer
-from sequence_encoder import SequenceEncoder
+from preprocess import SequenceEncoder
 import torch
 import torch.nn.functional as F
 import numpy as np

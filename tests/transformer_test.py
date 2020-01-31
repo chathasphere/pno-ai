@@ -24,15 +24,16 @@ def main():
             transpositions=range(-2,3), training_val_split=training_val_split, max_encoded_length=seq_length+1, min_encoded_length=33)
 
     pipeline.run()
-    training_sequences = pipeline.encoded_sequences['training']
-    validation_sequences = pipeline.encoded_sequences['validation']
+    training_sequences = pipeline.encoded_sequences['training'][:1000]
+    validation_sequences = pipeline.encoded_sequences['validation'][:100]
     n_tokens = 256 + sampling_rate + n_velocity_bins
     batch_size = 10
     optim="adam"
     transformer = MusicTransformer(n_tokens, seq_length=padded_length, d_model=4,
             d_feedforward=32, n_heads=4, positional_encoding=False)
 
-    train(transformer, training_sequences, validation_sequences, epochs = 1, evaluate_per=5, batch_size=batch_size, batches_per_print=1)
+    train(transformer, training_sequences, validation_sequences, epochs = 2, evaluate_per=1, batch_size=batch_size, batches_per_print=20,
+            padding_index=0, checkpoint_path = "../saved_models/test_save")
 
     print(sample(transformer, 10))
 

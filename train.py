@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import time
 from random import shuffle
+import pdb
 
 def batch_to_tensors(batch, n_tokens, max_length):
     """
@@ -35,15 +36,27 @@ def batch_to_tensors(batch, n_tokens, max_length):
         return x, y, x_mask 
 
 def train(model, training_data, validation_data,
-        epochs, batch_size, batches_per_print=100, evaluate_per=1):
+        epochs, batch_size, batches_per_print=100, evaluate_per=1,
+        padding_index=-100, checkpoint_path=None):
+    """
+    Training loop function.
+    Args:
+        model: MusicTransformer module
+        training_data: List of encoded music sequences
+        validation_data: List of encoded music sequences
+        epochs: Number of iterations over training batches
+        batch_size: _
+        batches_per_print: How often to print training loss
+        evaluate_per: calculate validation loss after this many epochs
+        padding_index: ignore this sequence token in loss calculation
+        checkpoint_path: (str or None) If defined, save the model's state dict to this file path after validation
+    """
 
     training_start_time = time.time()
 
     model.train()
     optimizer = torch.optim.Adam(model.parameters())
-    #loss_function = nn.CrossEntropyLoss(ignore_index=0)
-
-    loss_function = nn.CrossEntropyLoss()
+    loss_function = nn.CrossEntropyLoss(ignore_index=padding_index)
 
     if torch.cuda.is_available():
         model.cuda()
@@ -114,6 +127,14 @@ def train(model, training_data, validation_data,
                 y_hat = model(x, x_mask).transpose(1,2)
                 loss = loss_function(y_hat, y)
                 val_loss += loss.item()
+            if checkpoint_path is not None:
+                try:
+                    torch.save(model.state_dict(),
+                            checkpoint_path+f"_e{e}")
+                    print("Checkpoint saved!")
+                except:
+                    pdb.set_trace()
+                    print("Error: checkpoint could not be saved...")
                 n_batches += 1
 
             model.train()
