@@ -1,11 +1,8 @@
 # pno-ai
-Pianistic Neuralnets Offer Aleatoric Improvisations
+Pianistic Neuralnetworks Output Aleatoric Improvisations
 
 ### About
-A deep learning project written in Python & Pytorch to generate piano MIDI tracks.<br>
-Transform Piano MIDI data into "Event Sequences," a sparse MIDI representation giving instructions to play notes, release them, change dynamics, and shift time. This encoding is an efficient, computer-readable format for expressive piano music. After training sequence-to-sequence neural networks (such as RNNs or Transformers) on a preprocessed dataset, you can generate random samples of "learned" music with the `generate.py` file.
-
-Inspired by [this](https://magenta.tensorflow.org/music-transformer) blog post from Magenta.
+An implementation of Google Magenta's [Music Transformer](https://magenta.tensorflow.org/music-transformer) in Python/Pytorch. This library is designed to train a neural network on Piano MIDI data to generate musical samples. MIDIs are encoded into "Event Sequences", a dense array of musical instructions (note on, note off, dynamic change, time shift) encoded as numerical tokens. A custom transformer model learns to predict instructions on training sequences, and in `generate.py` a trained model can randomly sample from its learned distribution. (It is recommended to 'prime' the model's internal state with a MIDI input.)
 
 ### Training Data:
 The initial dataset comes from several years of recordings from the International Piano-e-Competition: over 1,000 performances played by professional pianists on a Yamaha Disklavier. Obtainable [here](https://magenta.tensorflow.org/datasets/maestro). A sufficiently large dataset (order of 50 MB) of piano MIDIs should be sufficient to train a model. 
@@ -15,6 +12,7 @@ The initial dataset comes from several years of recordings from the Internationa
 - Music Transformer AI Model: https://arxiv.org/abs/1809.04281
 - Relative self-attention: https://arxiv.org/abs/1803.02155
 - Original Transformer paper: https://arxiv.org/abs/1803.02155
-- Seq2Seq architecture: https://arxiv.org/abs/1409.3215
+- Guide to the above, with code: https://nlp.seas.harvard.edu/2018/04/03/attention.html
+- Very readable introduction to attention/transformers: http://www.peterbloem.nl/blog/transformers
 
 
