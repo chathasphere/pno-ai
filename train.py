@@ -127,6 +127,7 @@ def train(model, training_data, validation_data,
                 y_hat = model(x, x_mask).transpose(1,2)
                 loss = loss_function(y_hat, y)
                 val_loss += loss.item()
+                n_batches += 1
             if checkpoint_path is not None:
                 try:
                     torch.save(model.state_dict(),
@@ -135,7 +136,6 @@ def train(model, training_data, validation_data,
                 except:
                     pdb.set_trace()
                     print("Error: checkpoint could not be saved...")
-                n_batches += 1
 
             model.train()
             #average out validation loss
