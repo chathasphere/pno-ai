@@ -14,7 +14,7 @@ class MusicTransformer(nn.Module):
 
     def __init__(self, n_tokens, seq_length=None, d_model=64,
             n_heads=4, depth=2, d_feedforward=512, dropout=0.1,
-            positional_encoding=False):
+            positional_encoding=False, relative_pos=True):
         """
         Args:
             n_tokens: number of commands/states in encoded musical sequence
@@ -24,6 +24,7 @@ class MusicTransformer(nn.Module):
             depth: number of stacked transformer layers
             d_feedforward: dimensionality of dense sublayer 
             dropout: probability of dropout in dropout sublayer
+            relative_pos: (bool) if True, use relative positional embeddings
         """
         super().__init__()
         #number of commands in an encoded musical sequence
@@ -54,7 +55,7 @@ class MusicTransformer(nn.Module):
         #last layer, outputs logits of next token in sequence
         self.to_scores = nn.Linear(d_model, n_tokens)
         self.layers = clones(DecoderLayer(d_model, n_heads,
-            d_feedforward, dropout), depth)
+            d_feedforward, dropout, relative_pos), depth)
         self.norm = nn.LayerNorm(d_model)
     
     def forward(self, x, mask=None):
@@ -76,10 +77,12 @@ class MusicTransformer(nn.Module):
 
 class DecoderLayer(nn.Module):
 
-    def __init__(self, size, n_heads, d_feedforward, dropout):
+    def __init__(self, size, n_heads, d_feedforward, dropout,
+            relative_pos):
 
         super().__init__()
-        self.self_attn = MultiheadedAttention(size, n_heads, dropout)
+        self.self_attn = MultiheadedAttention(size, n_heads,
+                dropout, relative_pos)
         self.feed_forward = PositionwiseFeedForward(size, d_feedforward, dropout)
         self.size = size
         #normalize over mean/std of embedding dimension

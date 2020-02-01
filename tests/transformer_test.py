@@ -30,7 +30,8 @@ def main():
     batch_size = 10
     optim="adam"
     transformer = MusicTransformer(n_tokens, seq_length=padded_length, d_model=4,
-            d_feedforward=32, n_heads=4, positional_encoding=False)
+            d_feedforward=32, n_heads=4, positional_encoding=True,
+            relative_pos=True)
 
     train(transformer, training_sequences, validation_sequences, epochs = 2, evaluate_per=1, batch_size=batch_size, batches_per_print=20,
             padding_index=0, checkpoint_path = "../saved_models/test_save")

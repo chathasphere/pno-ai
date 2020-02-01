@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import time
 from random import shuffle
-import pdb
 
 def batch_to_tensors(batch, n_tokens, max_length):
     """
@@ -134,7 +133,6 @@ def train(model, training_data, validation_data,
                             checkpoint_path+f"_e{e}")
                     print("Checkpoint saved!")
                 except:
-                    pdb.set_trace()
                     print("Error: checkpoint could not be saved...")
 
             model.train()

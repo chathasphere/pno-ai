@@ -13,7 +13,7 @@ class MultiheadedAttention(nn.Module):
     fraction of the embedding space and expresses attention vectors for each sequence position as a weighted average of all (earlier) positions.
     """
 
-    def __init__(self, d_model, heads=8, dropout=0.1):
+    def __init__(self, d_model, heads=8, dropout=0.1, relative_pos=True):
 
         super().__init__()
         if d_model % heads != 0:
@@ -24,6 +24,14 @@ class MultiheadedAttention(nn.Module):
         self.linears = torch.nn.ModuleList([nn.Linear(s, s, bias=False) for i in range(3)])
         self.recombine_heads = nn.Linear(heads * s, d_model)
         self.dropout = nn.Dropout(p=dropout)
+        self.max_length = 1024
+        #relative positional embeddings
+        self.relative_pos = relative_pos
+        if relative_pos:
+            self.Er = torch.randn([heads, self.max_length, s],
+                    device=d())
+        else:
+            self.Er = None
 
     def forward(self, x, mask):
         #batch size, sequence length, embedding dimension
@@ -32,20 +40,32 @@ class MultiheadedAttention(nn.Module):
         #each head inspects a fraction of the embedded space
         #head dimension
         s = e // h
+        #start index of position embedding
+        embedding_start = self.max_length - t
         x = x.view(b,t,h,s)
-        #Apply weights to inputs and combine heads with batches
-        queries, keys, values = [linear(x).transpose(1,2).\
-                                 contiguous().view(b*h, t, s)
-          for linear, x in zip(self.linears, (x,x,x))]
+        queries, keys, values = [w(x).transpose(1,2)
+                for w, x in zip(self.linears, (x,x,x))]
+        if self.relative_pos:
+            #apply same position embeddings across the batch
+            Er  = self.Er[:, embedding_start:, :].unsqueeze(0)
+            QEr = torch.matmul(queries, Er.transpose(-1,-2))
+            QEr = self._mask_positions(QEr)
+            #Get relative position attention scores
+            #combine batch with head dimension
+            SRel = self._skew(QEr).contiguous().view(b*h, t, t)
+        else:
+            SRel = torch.zeros([b*h, t, t], device=d())
+        queries, keys, values = map(lambda x: x.contiguous()\
+                .view(b*h, t, s), (queries, keys, values))
         #Compute scaled dot-product self-attention
         #scale pre-matrix multiplication   
         queries = queries / (e ** (1/4))
         keys    = keys / (e ** (1/4))
 
-        # mask out the upper half of the dot matrix, excluding the diagonal
         scores = torch.bmm(queries, keys.transpose(1, 2))
+        scores = scores + SRel
+        #(b*h, t, t)
 
-        #subsequent_mask = torch.triu(torch.ones(1, t, t, device=d()), 0)
         subsequent_mask = torch.triu(torch.ones(1, t, t, device=d()),
                 1)
         scores = scores.masked_fill(subsequent_mask == 1, -1e9)
@@ -64,3 +84,20 @@ class MultiheadedAttention(nn.Module):
         out = out.transpose(1, 2).contiguous().view(b, t, s * h)
         #last linear layer of weights
         return self.recombine_heads(out)
+
+
+    def _mask_positions(self, qe):
+        #QEr is a matrix of queries (absolute position) dot distance embeddings (relative pos).
+        #Mask out invalid relative positions: e.g. if sequence length is L, the query at
+        #L-1 can only attend to distance r = 0 (no looking backward).
+        L = qe.shape[-1]
+        mask = torch.triu(torch.ones(L, L, device=d()), 1).flip(1)
+        return qe.masked_fill((mask == 1), 0)
+
+    def _skew(self, qe):
+        #pad a column of zeros on the left
+        padded_qe = F.pad(qe, [1,0])
+        s = padded_qe.shape
+        padded_qe = padded_qe.view(s[0], s[1], s[3], s[2])
+        #take out first (padded) row
+        return padded_qe[:,:,1:,:]
