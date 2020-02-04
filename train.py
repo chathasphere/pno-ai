@@ -1,8 +1,24 @@
 from helpers import prepare_batches
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import time
 from random import shuffle
+
+class Accuracy(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, prediction, target, token_dim=-1, 
+            sequence_dim=-2):
+
+        #normalize by token classes and guess most probable sequence
+        prediction = F.softmax(prediction, token_dim)\
+                .argmax(sequence_dim)
+
+        scores = (prediction == target)
+        return scores.sum() / float(scores.numel())
+
 
 def batch_to_tensors(batch, n_tokens, max_length):
     """
@@ -56,6 +72,7 @@ def train(model, training_data, validation_data,
     model.train()
     optimizer = torch.optim.Adam(model.parameters())
     loss_function = nn.CrossEntropyLoss(ignore_index=padding_index)
+    accuracy = Accuracy()
 
     if torch.cuda.is_available():
         model.cuda()
@@ -73,6 +90,7 @@ def train(model, training_data, validation_data,
         batch_start_time = time.time()
         batch_num = 1
         averaged_loss = 0
+        averaged_accuracy = 0
         training_batches = prepare_batches(training_data, batch_size) #returning batches of a given size
         for batch in training_batches:
 
@@ -98,9 +116,12 @@ def train(model, training_data, validation_data,
             training_losses.append(training_loss)
             #take average over subset of batch?
             averaged_loss += training_loss
+            averaged_accuracy += accuracy(y_hat, y)
             if batch_num % batches_per_print == 0:
                 print(f"batch {batch_num}, loss: {averaged_loss / batches_per_print : .2f}")
+                print(f"accuracy: {averaged_accuracy / batches_per_print : .2f}")
                 averaged_loss = 0
+                averaged_accuracy = 0
             batch_num += 1
 
         print(f"epoch: {e+1}/{epochs} | time: {(time.time() - batch_start_time) / 60:,.0f}m")
@@ -115,6 +136,7 @@ def train(model, training_data, validation_data,
             #get loss per batch
             val_loss = 0
             n_batches = 0
+            val_accuracy = 0
             for batch in validation_batches:
 
                 if len(batch[0]) != batch_size:
@@ -126,7 +148,9 @@ def train(model, training_data, validation_data,
                 y_hat = model(x, x_mask).transpose(1,2)
                 loss = loss_function(y_hat, y)
                 val_loss += loss.item()
+                val_accuracy += accuracy(y_hat, y)
                 n_batches += 1
+
             if checkpoint_path is not None:
                 try:
                     torch.save(model.state_dict(),
@@ -137,9 +161,11 @@ def train(model, training_data, validation_data,
 
             model.train()
             #average out validation loss
+            val_accuracy = (val_accuracy / n_batches)
             val_loss = (val_loss / n_batches)
             validation_losses.append(val_loss)
             print(f"validation loss: {val_loss:.2f}")
+            print(f"validation accuracy: {val_accuracy:.2f}")
             shuffle(validation_data)
 
     return training_losses

@@ -3,7 +3,6 @@ import numpy as np
 from pretty_midi import Note, PrettyMIDI, Instrument
 import torch.nn.functional as F
 import copy, pathlib
-import pdb
 
 def vectorize(sequence):
     """
@@ -102,7 +101,6 @@ def sample(model, sample_length, prime_sequence=[], temperature=1):
         #out is a 1d tensor of shape (n_tokens)
         probs = F.softmax(out / temperature, dim=0)
         #sample prob distribution for next character
-        pdb.set_trace()
         c = torch.multinomial(probs,1)
         input_tensor = torch.cat([input_tensor[:,1:], c[None]], dim=1)
         input_sequence.append(c.item())
