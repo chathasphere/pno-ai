@@ -1,8 +1,9 @@
 import torch
 import numpy as np
-from pretty_midi import Note
+from pretty_midi import Note, PrettyMIDI, Instrument
 import torch.nn.functional as F
-import copy
+import copy, pathlib
+import pdb
 
 def vectorize(sequence):
     """
@@ -66,3 +67,45 @@ def d(tensor=None):
     if tensor is None:
         return 'cuda' if torch.cuda.is_available() else 'cpu'
     return 'cuda' if tensor.is_cuda else 'cpu'
+
+def write_midi(note_sequence, output_dir, filename):
+
+    #make output directory
+    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    #generate midi
+    midi = PrettyMIDI()
+    piano_track = Instrument(program=0, is_drum=False, name=filename)
+    piano_track.notes = note_sequence
+    midi.instruments.append(piano_track)
+    output_name = output_dir + f"{filename}.midi"
+    midi.write(output_name)
+
+def sample(model, sample_length, prime_sequence=[], temperature=1):
+    """
+    Generate a MIDI event sequence of a fixed length by randomly sampling from a model's distribution of sequences. Optionally, "seed" the sequence with a prime. A well-trained model will create music that responds to the prime and develops upon it.
+    """
+    #deactivate training mode
+    model.eval()
+    if len(prime_sequence) == 0:
+        #if no prime is provided, randomly select a starting event
+        input_sequence = [np.random.randint(model.n_tokens)]
+    else:
+        input_sequence = prime_sequence.copy()
+
+    #add singleton dimension for the batch
+    input_tensor = torch.LongTensor(input_sequence).unsqueeze(0)
+
+    for i in range(sample_length):
+        #select probabilities of *next* token
+        out = model(input_tensor)[0, -1, :]
+        #out is a 1d tensor of shape (n_tokens)
+        probs = F.softmax(out / temperature, dim=0)
+        #sample prob distribution for next character
+        pdb.set_trace()
+        c = torch.multinomial(probs,1)
+        input_tensor = torch.cat([input_tensor[:,1:], c[None]], dim=1)
+        input_sequence.append(c.item())
+
+    return input_sequence
+

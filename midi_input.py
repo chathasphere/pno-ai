@@ -69,7 +69,7 @@ def read(n_velocity_events=32, n_time_shift_events=125):
             i += 1
 
         note_sequence = quantize(note_sequence, n_velocity_events, n_time_shift_events)
-        #sigh bad practice
+
         note_sequence = vectorize(note_sequence)
         return note_sequence
 
@@ -84,10 +84,8 @@ def quantize(note_sequence, n_velocity_events, n_time_shift_events):
 
         note.velocity = (note.velocity // velocity_step) * velocity_step + 1
 
+
     return note_sequence
-
-
-
 
 if __name__ == "__main__":
     read()

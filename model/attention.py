@@ -47,6 +47,8 @@ class MultiheadedAttention(nn.Module):
                 for w, x in zip(self.linears, (x,x,x))]
         if self.relative_pos:
             #apply same position embeddings across the batch
+            #Is it possible to apply positional self-attention over
+            #only half of all relative distances?
             Er  = self.Er[:, embedding_start:, :].unsqueeze(0)
             QEr = torch.matmul(queries, Er.transpose(-1,-2))
             QEr = self._mask_positions(QEr)

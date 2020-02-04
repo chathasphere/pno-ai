@@ -103,7 +103,7 @@ def train(model, training_data, validation_data,
                 averaged_loss = 0
             batch_num += 1
 
-        print(f"epoch: {e+1}/{epochs} | time: {time.time() - batch_start_time:.0f}s")
+        print(f"epoch: {e+1}/{epochs} | time: {(time.time() - batch_start_time) / 60:,.0f}m")
         shuffle(training_data)
 
         if (e + 1) % evaluate_per == 0:
