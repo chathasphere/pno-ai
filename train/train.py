@@ -1,24 +1,9 @@
 from helpers import prepare_batches
+from .custom import Accuracy, smooth_cross_entropy, TFSchedule
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import time
 from random import shuffle
-
-class Accuracy(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, prediction, target, token_dim=-1, 
-            sequence_dim=-2):
-
-        #normalize by token classes and guess most probable sequence
-        prediction = F.softmax(prediction, token_dim)\
-                .argmax(sequence_dim)
-
-        scores = (prediction == target)
-        return scores.sum() / float(scores.numel())
-
 
 def batch_to_tensors(batch, n_tokens, max_length):
     """
@@ -52,7 +37,8 @@ def batch_to_tensors(batch, n_tokens, max_length):
 
 def train(model, training_data, validation_data,
         epochs, batch_size, batches_per_print=100, evaluate_per=1,
-        padding_index=-100, checkpoint_path=None):
+        padding_index=-100, checkpoint_path=None,
+        custom_schedule=False, custom_loss=False):
     """
     Training loop function.
     Args:
@@ -65,13 +51,22 @@ def train(model, training_data, validation_data,
         evaluate_per: calculate validation loss after this many epochs
         padding_index: ignore this sequence token in loss calculation
         checkpoint_path: (str or None) If defined, save the model's state dict to this file path after validation
+        custom_schedule: (bool) If True, use a learning rate scheduler with a warmup ramp
+        custom_loss: (bool) If True, set loss function as Cross Entropy with label smoothing
     """
 
     training_start_time = time.time()
 
     model.train()
     optimizer = torch.optim.Adam(model.parameters())
-    loss_function = nn.CrossEntropyLoss(ignore_index=padding_index)
+
+    if custom_schedule:
+        optimizer = TFSchedule(optimizer, model.d_model)
+    
+    if custom_loss:
+        loss_function = smooth_cross_entropy
+    else:
+        loss_function = nn.CrossEntropyLoss(ignore_index=padding_index)
     accuracy = Accuracy()
 
     if torch.cuda.is_available():
@@ -104,6 +99,7 @@ def train(model, training_data, validation_data,
             #shape: (batch_size, n_tokens, seq_length)
 
             loss = loss_function(y_hat, y)
+            #loss2 = smooth_cross_entropy(y_hat, y)
 
             #detach hidden state from the computation graph; we don't need its gradient
             #clear old gradients from previous step

@@ -34,7 +34,7 @@ def main():
             relative_pos=True)
 
     train(transformer, training_sequences, validation_sequences, epochs = 2, evaluate_per=1, batch_size=batch_size, batches_per_print=20,
-            padding_index=0, checkpoint_path = "../saved_models/test_save")
+            padding_index=0, checkpoint_path = "../saved_models/test_save", custom_schedule=True)
 
     print(sample(transformer, 10))
 

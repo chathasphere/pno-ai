@@ -30,6 +30,7 @@ class MusicTransformer(nn.Module):
         #number of commands in an encoded musical sequence
         self.n_tokens = n_tokens
         #embedding layer
+        self.d_model = d_model
         self.embed = SequenceEmbedding(n_tokens, d_model)
         #positional encoding layer
         self.positional_encoding = positional_encoding
