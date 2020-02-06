@@ -17,6 +17,7 @@ def batch_to_tensors(batch, n_tokens, max_length):
     #padding element
     y = torch.zeros(batch_size, max_length, dtype=torch.long)
 
+
     for i, sequence in enumerate(input_sequences):
         seq_length = sequence_lengths[i]
         #copy over input sequence data with zero-padding
@@ -99,7 +100,6 @@ def train(model, training_data, validation_data,
             #shape: (batch_size, n_tokens, seq_length)
 
             loss = loss_function(y_hat, y)
-            #loss2 = smooth_cross_entropy(y_hat, y)
 
             #detach hidden state from the computation graph; we don't need its gradient
             #clear old gradients from previous step
@@ -112,7 +112,7 @@ def train(model, training_data, validation_data,
             training_losses.append(training_loss)
             #take average over subset of batch?
             averaged_loss += training_loss
-            averaged_accuracy += accuracy(y_hat, y)
+            averaged_accuracy += accuracy(y_hat, y, x_mask)
             if batch_num % batches_per_print == 0:
                 print(f"batch {batch_num}, loss: {averaged_loss / batches_per_print : .2f}")
                 print(f"accuracy: {averaged_accuracy / batches_per_print : .2f}")
@@ -144,7 +144,7 @@ def train(model, training_data, validation_data,
                 y_hat = model(x, x_mask).transpose(1,2)
                 loss = loss_function(y_hat, y)
                 val_loss += loss.item()
-                val_accuracy += accuracy(y_hat, y)
+                val_accuracy += accuracy(y_hat, y, mask)
                 n_batches += 1
 
             if checkpoint_path is not None:

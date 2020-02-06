@@ -2,20 +2,24 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch
 
-
 class Accuracy(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, prediction, target, token_dim=-1,
+    def forward(self, prediction, target, mask=None, token_dim=-1,
             sequence_dim=-2):
 
         #normalize by token classes and guess most probable sequence
         prediction = F.softmax(prediction, token_dim)\
                 .argmax(sequence_dim)
 
+
         scores = (prediction == target)
-        return scores.sum() / float(scores.numel())
+        n_padded = 0
+        if mask is not None:
+            n_padded = (mask == 0).sum()
+        return scores.sum() / float(scores.numel() - n_padded)
+
 
 def smooth_cross_entropy(prediction, target, eps=0.1,
         ignore_index=0):
@@ -38,6 +42,7 @@ def smooth_cross_entropy(prediction, target, eps=0.1,
     n_items = torch.sum(target != ignore_index)
 
     return h / n_items
+
 
 class TFSchedule:
     """
